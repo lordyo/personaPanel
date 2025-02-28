@@ -1,0 +1,150 @@
+dimensions:
+  - name: gender
+    description: The gender identity of the persona
+    type: categorical
+    importance: medium
+    constraints:
+      allowed_values:
+        - male
+        - female
+        - non-binary
+        - other
+    examples:
+      - male
+      - female
+      - non-binary
+
+  - name: age
+    description: The age of the persona in years
+    type: numeric
+    importance: high
+    constraints:
+      min: 18
+      max: 90
+    examples:
+      - 25
+      - 42
+      - 67
+
+  - name: occupation
+    description: The primary occupation or profession of the persona
+    type: text
+    importance: high
+    examples:
+      - software engineer
+      - teacher
+      - doctor
+      - artist
+      - retired
+
+  - name: education_level
+    description: The highest level of education completed by the persona
+    type: categorical
+    importance: medium
+    constraints:
+      allowed_values:
+        - high school
+        - some college
+        - bachelor's degree
+        - master's degree
+        - doctoral degree
+        - professional degree
+    examples:
+      - bachelor's degree
+      - high school
+      - doctoral degree
+
+  - name: personality_openness
+    description: Openness to experience (Big Five personality trait)
+    type: numeric
+    importance: high
+    constraints:
+      min: 1
+      max: 10
+    examples:
+      - 8
+      - 3
+      - 5
+
+  - name: personality_conscientiousness
+    description: Conscientiousness (Big Five personality trait)
+    type: numeric
+    importance: high
+    constraints:
+      min: 1
+      max: 10
+    examples:
+      - 7
+      - 4
+      - 9
+
+  - name: personality_extraversion
+    description: Extraversion (Big Five personality trait)
+    type: numeric
+    importance: high
+    constraints:
+      min: 1
+      max: 10
+    examples:
+      - 2
+      - 6
+      - 9
+
+  - name: personality_agreeableness
+    description: Agreeableness (Big Five personality trait)
+    type: numeric
+    importance: high
+    constraints:
+      min: 1
+      max: 10
+    examples:
+      - 8
+      - 5
+      - 3
+
+  - name: personality_neuroticism
+    description: Neuroticism (Big Five personality trait)
+    type: numeric
+    importance: high
+    constraints:
+      min: 1
+      max: 10
+    examples:
+      - 4
+      - 7
+      - 2
+
+  - name: nationality
+    description: The country of origin or primary national identity
+    type: text
+    importance: medium
+    examples:
+      - American
+      - Indian
+      - Brazilian
+      - Japanese
+      - Nigerian
+
+  - name: socioeconomic_background
+    description: The socioeconomic background of the persona
+    type: categorical
+    importance: medium
+    constraints:
+      allowed_values:
+        - working class
+        - middle class
+        - upper middle class
+        - affluent
+    examples:
+      - middle class
+      - working class
+      - affluent
+
+  - name: values
+    description: Core values or principles important to the persona
+    type: text
+    importance: high
+    examples:
+      - family, honesty, hard work
+      - creativity, independence, adventure
+      - community, tradition, loyalty 

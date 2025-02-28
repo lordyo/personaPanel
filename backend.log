@@ -1,0 +1,32 @@
+nohup: ignoring input
+Python path configuration:
+  PYTHONHOME = '/tmp/.mount_cursorShy1Q5/usr/'
+  PYTHONPATH = '/tmp/.mount_cursorShy1Q5/usr/share/pyshared/:'
+  program name = 'venv/bin/python'
+  isolated = 0
+  environment = 1
+  user site = 1
+  safe_path = 0
+  import site = 1
+  is in build tree = 0
+  stdlib dir = '/tmp/.mount_cursorShy1Q5/usr/lib/python3.11'
+  sys._base_executable = '/mnt/dpvs/Documents/6-Programming/2025-02-25_PersonaPanel/venv/bin/python'
+  sys.base_prefix = '/tmp/.mount_cursorShy1Q5/usr/'
+  sys.base_exec_prefix = '/tmp/.mount_cursorShy1Q5/usr/'
+  sys.platlibdir = 'lib'
+  sys.executable = '/mnt/dpvs/Documents/6-Programming/2025-02-25_PersonaPanel/venv/bin/python'
+  sys.prefix = '/tmp/.mount_cursorShy1Q5/usr/'
+  sys.exec_prefix = '/tmp/.mount_cursorShy1Q5/usr/'
+  sys.path = [
+    '/tmp/.mount_cursorShy1Q5/usr/share/pyshared',
+    '/mnt/dpvs/Documents/6-Programming/2025-02-25_PersonaPanel',
+    '/tmp/.mount_cursorShy1Q5/usr/lib/python311.zip',
+    '/tmp/.mount_cursorShy1Q5/usr/lib/python3.11',
+    '/tmp/.mount_cursorShy1Q5/usr/lib/python3.11/lib-dynload',
+  ]
+Fatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding
+Python runtime state: core initialized
+ModuleNotFoundError: No module named 'encodings'
+
+Current thread 0x00007f07ab3f0780 (most recent call first):
+  <no Python frame>

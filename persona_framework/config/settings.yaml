@@ -1,0 +1,14 @@
+# Framework settings
+generation:
+  default_model: "claude-3-sonnet-20240229"
+  temperature: 0.7
+  diversity_preference: "high"
+  backstory_detail_level: "medium"
+  
+validation:
+  strictness: "medium"
+  coherence_threshold: 0.8
+  
+persistence:
+  format: "yaml"
+  default_save_location: "./personas" 
