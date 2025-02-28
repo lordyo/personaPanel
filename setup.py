@@ -1,30 +1,19 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="persona_framework",
+    name="persona_panel",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
-        "dspy-ai",
-        "pyyaml",
+        "fastapi>=0.100.0",
+        "uvicorn>=0.22.0",
+        "pydantic>=2.0.0",
+        "sqlalchemy>=2.0.0",
+        "python-dotenv>=1.0.0",
     ],
-    author="AI Developer",
-    author_email="ai@example.com",
-    description="A DSPy-based framework for generating and utilizing AI personas",
-    long_description=open("project_docs/concept.md").read(),
-    long_description_content_type="text/markdown",
-    url="https://github.com/example/persona_framework",
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-    ],
+    author="PersonaPanel Team",
+    author_email="example@example.com",
+    description="A comprehensive application for managing and interacting with different AI personas",
+    keywords="ai, personas, chat, management",
     python_requires=">=3.8",
-    include_package_data=True,
-    package_data={
-        "persona_framework": [
-            "config/dimensions/*.yaml",
-            "config/settings.yaml",
-        ],
-    },
 ) 

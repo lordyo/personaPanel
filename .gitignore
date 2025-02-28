@@ -1,6 +1,3 @@
-# Environment variables
-.env
-
 # Python
 __pycache__/
 *.py[cod]
@@ -22,6 +19,33 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+.env
+venv/
+.venv/
+fresh_venv/
 
-# Output files
-persona_framework/examples/output/
+# Node.js
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.pnp/
+.pnp.js
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Cursor IDE
+.cursor/ 
