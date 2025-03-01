@@ -22,6 +22,27 @@ This framework provides a foundation for creating and simulating diverse virtual
 - Node.js 14+ and npm
 - OpenAI API key or compatible LLM provider
 
+### Python Environment Setup
+
+If you're experiencing issues with Python in Cursor IDE or other environments, we've provided scripts to help set up a clean Python environment:
+
+1. **Diagnose Python Issues**
+   ```bash
+   ./diagnose_python.py
+   ```
+   This script checks your Python installation and configuration, identifying common issues and providing recommendations.
+
+2. **Set Up Python Environment**
+   ```bash
+   ./setup_python_env.sh
+   ```
+   This script creates a virtual environment, installs dependencies, and sets up helper scripts for running the application and tests.
+
+3. **Helper Scripts**
+   - `./activate-env` - Activates the virtual environment
+   - `./run-app` - Runs the backend application in the virtual environment
+   - `./run-tests` - Runs tests in the virtual environment
+
 ### Installation
 
 1. Clone the repository
@@ -91,9 +112,14 @@ entity-simulation-framework/
 ├── data/                     # Data storage
 │   └── db.sqlite             # SQLite database (created on init)
 ├── docs/                     # Documentation
-└── tests/                    # Tests
-    ├── backend/              # Backend tests
-    └── frontend/             # Frontend tests
+├── tests/                    # Tests
+│   ├── backend/              # Backend tests
+│   └── frontend/             # Frontend tests
+├── diagnose_python.py        # Python diagnostic script
+├── setup_python_env.sh       # Python environment setup script
+├── activate-env              # Virtual environment activation script
+├── run-app                   # Application runner script
+└── run-tests                 # Test runner script
 ```
 
 ## Documentation

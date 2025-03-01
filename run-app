@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Unset problematic environment variables
+unset PYTHONHOME
+unset PYTHONPATH
+
+# Check if virtual environment exists
+if [ ! -d ".venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv .venv
+fi
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Install requirements if needed
+if [ -f "requirements.txt" ]; then
+    echo "Installing requirements..."
+    pip install -r requirements.txt
+fi
+
+# Run the backend app
+echo "Starting backend application..."
+python backend/app.py
+
+# Deactivate virtual environment when done
+deactivate
+
+# If you need to run with Flask development server options,
+# uncomment the line below and comment the one above
+# FLASK_DEBUG=1 python3 backend/app.py 

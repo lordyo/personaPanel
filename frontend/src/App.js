@@ -2,6 +2,11 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 
+// Import our new pages
+import EntityTypeList from './pages/EntityTypeList';
+import EntityTypeCreate from './pages/EntityTypeCreate';
+import TemplateDetail from './pages/TemplateDetail';
+
 // Placeholder components for the initial structure
 const Home = () => (
   <div className="container">
@@ -27,14 +32,15 @@ const Home = () => (
   </div>
 );
 
-const EntityTypes = () => (
-  <div className="container">
-    <h1>Entity Types</h1>
-    <p>This page will allow you to create, view, and manage entity types.</p>
-    <p>Coming soon in a future sprint...</p>
-    <Link to="/">Back to Home</Link>
-  </div>
-);
+// We're replacing the placeholder with our new implementation
+// const EntityTypes = () => (
+//   <div className="container">
+//     <h1>Entity Types</h1>
+//     <p>This page will allow you to create, view, and manage entity types.</p>
+//     <p>Coming soon in a future sprint...</p>
+//     <Link to="/">Back to Home</Link>
+//   </div>
+// );
 
 const Entities = () => (
   <div className="container">
@@ -84,13 +90,17 @@ function App() {
         <main className="content">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/entity-types" element={<EntityTypes />} />
+            {/* Entity Type Management Routes */}
+            <Route path="/entity-types" element={<EntityTypeList />} />
+            <Route path="/entity-types/create" element={<EntityTypeCreate />} />
+            <Route path="/templates/:templateId" element={<TemplateDetail />} />
+            {/* Placeholder routes */}
             <Route path="/entities" element={<Entities />} />
             <Route path="/simulations" element={<Simulations />} />
           </Routes>
         </main>
         <footer className="footer">
-          <p>Entity Simulation Framework &copy; 2025</p>
+          <p>Entity Simulation Framework &copy; 2023</p>
         </footer>
       </div>
     </Router>

@@ -11,10 +11,11 @@ from flask_cors import CORS
 import dspy
 
 # Import modules
-from backend.core.entity import EntityType, EntityInstance, Dimension
-from backend.core.simulation import SimulationEngine, Context, InteractionType
-from backend.llm.dspy_modules import EntityGenerator, SoloInteractionSimulator
-import backend.storage as storage
+from core.entity import EntityType, EntityInstance, Dimension
+from core.simulation import SimulationEngine, Context, InteractionType
+from llm.dspy_modules import EntityGenerator, SoloInteractionSimulator
+import storage as storage
+from core.templates import get_template_names, get_template
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -213,6 +214,107 @@ def get_simulations():
         return jsonify(simulations)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Template endpoints
+@app.route('/api/templates', methods=['GET'])
+def get_templates():
+    """Get a list of available entity templates."""
+    try:
+        templates = get_template_names()
+        return jsonify({
+            'status': 'success',
+            'data': templates
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/templates/<template_id>', methods=['GET'])
+def get_template_details(template_id):
+    """Get details for a specific template."""
+    try:
+        template = get_template(template_id)
+        if not template:
+            return jsonify({
+                'status': 'error',
+                'message': f'Template with id {template_id} not found'
+            }), 404
+            
+        return jsonify({
+            'status': 'success',
+            'data': template
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/templates/<template_id>/create', methods=['POST'])
+def create_entity_type_from_template(template_id):
+    """Create a new entity type based on a template."""
+    try:
+        template = get_template(template_id)
+        if not template:
+            return jsonify({
+                'status': 'error',
+                'message': f'Template with id {template_id} not found'
+            }), 404
+            
+        # Get customization data from request
+        data = request.json
+        name = data.get('name', template['name'])
+        description = data.get('description', template['description'])
+        
+        # Get dimensions from template, potentially customized by request
+        dimensions = template['dimensions']
+        
+        # Handle customization of dimensions if provided
+        if 'dimensions' in data:
+            custom_dimensions = data['dimensions']
+            # This is a simplified approach - in a real implementation, you might
+            # want to merge the customizations with the template dimensions more carefully
+            for i, dimension in enumerate(dimensions):
+                if i < len(custom_dimensions) and custom_dimensions[i]:
+                    # Update any non-null properties from the customization
+                    for key, value in custom_dimensions[i].items():
+                        if value is not None:
+                            dimensions[i].__dict__[key] = value
+        
+        # Convert dimensions to the format expected by save_entity_type
+        dimension_dicts = [
+            {
+                'name': d.name,
+                'description': d.description,
+                'type': d.type,
+                'options': d.options,
+                'min_value': d.min_value,
+                'max_value': d.max_value,
+                'distribution': d.distribution
+            }
+            for d in dimensions
+        ]
+        
+        # Create the entity type
+        entity_type_id = storage.save_entity_type(name, description, dimension_dicts)
+        
+        # Return the created entity type
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'id': entity_type_id,
+                'name': name,
+                'description': description,
+                'dimensions': dimension_dicts
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 
