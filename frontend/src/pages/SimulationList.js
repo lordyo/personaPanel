@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, Typography, Container, Paper, Button, 
-  CircularProgress, Alert, Table, TableBody, 
-  TableCell, TableContainer, TableHead, TableRow,
-  Chip, IconButton, Tooltip
-} from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { simulationApi } from '../services/api';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import AddIcon from '@mui/icons-material/Add';
-import theme from '../theme';
+import LoadingIndicator from '../components/LoadingIndicator';
 
 /**
  * Page for viewing saved simulations
@@ -23,12 +15,20 @@ const SimulationList = () => {
   useEffect(() => {
     const fetchSimulations = async () => {
       try {
-        const data = await simulationApi.getAll();
-        setSimulations(data);
+        const response = await simulationApi.getAll();
+        if (response && response.status === 'success') {
+          setSimulations(response.data || []);
+          setError(null);
+        } else {
+          console.error('Error fetching simulations:', response?.message || 'Unknown error');
+          setError(response?.message || 'Failed to load simulations');
+          setSimulations([]);
+        }
         setLoading(false);
       } catch (err) {
         console.error("Error fetching simulations:", err);
         setError("Failed to load simulations. Please try again later.");
+        setSimulations([]);
         setLoading(false);
       }
     };
@@ -51,199 +51,111 @@ const SimulationList = () => {
   };
 
   if (loading) {
-    return (
-      <Box 
-        display="flex" 
-        justifyContent="center" 
-        alignItems="center" 
-        minHeight="80vh"
-        bgcolor={theme.background}
-      >
-        <CircularProgress sx={{ color: theme.primary }} />
-      </Box>
-    );
+    return <LoadingIndicator message="Loading simulations..." fullPage />;
   }
 
   return (
-    <Container maxWidth="lg">
-      <Box my={4}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography 
-            variant="h4" 
-            component="h1"
-            sx={{ color: theme.heading }}
-          >
-            Simulations
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-blue-300">Simulations</h1>
+        <button
+          onClick={handleCreateSimulation}
+          className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+          </svg>
+          Create Simulation
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-400 bg-opacity-10 border border-red-400 rounded-lg text-red-400">
+          {error}
+        </div>
+      )}
+
+      {simulations.length === 0 ? (
+        <div className="bg-gray-800 p-8 text-center rounded-lg border border-gray-700 shadow-lg">
+          <h2 className="text-xl font-semibold text-blue-300 mb-2">No simulations found</h2>
+          <p className="text-gray-400 mb-6">Create your first simulation to get started</p>
+          <button
             onClick={handleCreateSimulation}
-            sx={{
-              bgcolor: theme.primary,
-              color: theme.colors.base3,
-              '&:hover': {
-                bgcolor: theme.colors.violet,
-              }
-            }}
+            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors mx-auto"
           >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
             Create Simulation
-          </Button>
-        </Box>
-
-        {error && (
-          <Alert 
-            severity="error" 
-            sx={{ 
-              mb: 3,
-              color: theme.error,
-              '& .MuiAlert-icon': {
-                color: theme.error
-              }
-            }}
-          >
-            {error}
-          </Alert>
-        )}
-
-        {simulations.length === 0 ? (
-          <Paper 
-            elevation={2} 
-            sx={{ 
-              p: 4, 
-              textAlign: 'center',
-              bgcolor: theme.cardBackground,
-              color: theme.text,
-              borderRadius: theme.borderRadius.medium
-            }}
-          >
-            <Typography variant="h6" sx={{ color: theme.heading }}>
-              No simulations found
-            </Typography>
-            <Typography variant="body1" sx={{ mt: 2, mb: 3, color: theme.text }}>
-              Create your first simulation to get started
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreateSimulation}
-              sx={{
-                bgcolor: theme.primary,
-                color: theme.colors.base3,
-                '&:hover': {
-                  bgcolor: theme.colors.violet,
-                }
-              }}
-            >
-              Create Simulation
-            </Button>
-          </Paper>
-        ) : (
-          <TableContainer 
-            component={Paper} 
-            sx={{ 
-              bgcolor: theme.cardBackground,
-              borderRadius: theme.borderRadius.medium,
-              boxShadow: theme.shadows.medium
-            }}
-          >
-            <Table>
-              <TableHead>
-                <TableRow sx={{ 
-                  '& th': { 
-                    color: theme.colors.base2,
-                    bgcolor: theme.colors.base01,
-                    fontWeight: theme.typography.fontWeight.semibold
-                  }
-                }}>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Created</TableCell>
-                  <TableCell>Context</TableCell>
-                  <TableCell>Entities</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+          </button>
+        </div>
+      ) : (
+        <div className="bg-gray-800 rounded-lg border border-gray-700 shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr className="bg-gray-750">
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-300">Name</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-300">Created</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-300">Context</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-300">Entities</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-300">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
                 {simulations.map((simulation) => (
-                  <TableRow 
+                  <tr 
                     key={simulation.id}
-                    hover
-                    sx={{ 
-                      '&:hover': { 
-                        bgcolor: `${theme.colors.base02} !important`
-                      },
-                      '& td': { 
-                        color: theme.text,
-                        borderColor: theme.border
-                      }
-                    }}
+                    className="hover:bg-gray-750 transition-colors"
                   >
-                    <TableCell>{simulation.name}</TableCell>
-                    <TableCell>{formatDate(simulation.created_at)}</TableCell>
-                    <TableCell>
+                    <td className="py-3 px-4 text-gray-300">{simulation.name}</td>
+                    <td className="py-3 px-4 text-gray-300">{formatDate(simulation.created_at)}</td>
+                    <td className="py-3 px-4 text-gray-300">
                       {simulation.context.length > 70 
                         ? `${simulation.context.substring(0, 70)}...` 
                         : simulation.context}
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="py-3 px-4">
                       {simulation.entities.length > 0 ? (
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        <div className="flex flex-wrap gap-1">
                           {simulation.entities.slice(0, 3).map((entity, index) => (
-                            <Chip 
+                            <span 
                               key={index} 
-                              label={entity.name} 
-                              size="small"
-                              sx={{ 
-                                bgcolor: theme.colors.base01,
-                                color: theme.colors.base2,
-                                '& .MuiChip-label': { 
-                                  px: 1 
-                                }
-                              }} 
-                            />
+                              className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded-full"
+                            >
+                              {entity.name}
+                            </span>
                           ))}
                           {simulation.entities.length > 3 && (
-                            <Chip 
-                              label={`+${simulation.entities.length - 3} more`} 
-                              size="small"
-                              sx={{ 
-                                bgcolor: theme.colors.base01,
-                                color: theme.colors.base0
-                              }} 
-                            />
+                            <span className="px-2 py-1 text-xs bg-gray-700 text-gray-500 rounded-full">
+                              +{simulation.entities.length - 3} more
+                            </span>
                           )}
-                        </Box>
+                        </div>
                       ) : (
-                        <Typography variant="body2" sx={{ color: theme.colors.base01 }}>
-                          No entities
-                        </Typography>
+                        <span className="text-gray-500">No entities</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="View Details">
-                        <IconButton 
-                          onClick={() => handleViewSimulation(simulation.id)}
-                          size="small"
-                          sx={{ 
-                            color: theme.primary,
-                            '&:hover': { 
-                              color: theme.colors.violet,
-                              bgcolor: 'rgba(38, 139, 210, 0.1)'
-                            }
-                          }}
-                        >
-                          <VisibilityIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                    <td className="py-3 px-4">
+                      <button 
+                        onClick={() => handleViewSimulation(simulation.id)}
+                        className="p-1 text-blue-400 hover:text-blue-300 rounded-full hover:bg-blue-900 hover:bg-opacity-20 transition-colors"
+                        title="View Details"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Box>
-    </Container>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -150,30 +150,74 @@ def get_entity_type(entity_type_id: str) -> Optional[Dict[str, Any]]:
 
 def get_all_entity_types() -> List[Dict[str, Any]]:
     """
-    Get all entity types.
+    Get all entity types from the database.
     
     Returns:
         List of entity type dictionaries
     """
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cursor.execute('SELECT * FROM entity_types')
+    cursor.execute('''
+    SELECT id, name, description, dimensions, created_at
+    FROM entity_types
+    ORDER BY name
+    ''')
+    
     rows = cursor.fetchall()
+    entity_types = []
+    
+    for row in rows:
+        entity_type = {
+            'id': row['id'],
+            'name': row['name'],
+            'description': row['description'],
+            'dimensions': json.loads(row['dimensions']),
+            'created_at': row['created_at']
+        }
+        entity_types.append(entity_type)
     
     conn.close()
-    
-    entity_types = []
-    for row in rows:
-        entity_types.append({
-            'id': row[0],
-            'name': row[1],
-            'description': row[2],
-            'dimensions': json.loads(row[3]),
-            'created_at': row[4]
-        })
-    
     return entity_types
+
+
+def update_entity_type(entity_type_id: str, name: str, description: str, dimensions: List[Dict[str, Any]]) -> bool:
+    """
+    Update an existing entity type in the database.
+    
+    Args:
+        entity_type_id: ID of the entity type to update
+        name: New name of the entity type
+        description: New description of the entity type
+        dimensions: New list of dimension objects
+        
+    Returns:
+        True if the update was successful, False otherwise
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+        UPDATE entity_types
+        SET name = ?, description = ?, dimensions = ?
+        WHERE id = ?
+        ''', (name, description, json.dumps(dimensions), entity_type_id))
+        
+        if cursor.rowcount == 0:
+            # No rows were updated, entity type not found
+            conn.close()
+            return False
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error updating entity type: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 
 # Entity Functions

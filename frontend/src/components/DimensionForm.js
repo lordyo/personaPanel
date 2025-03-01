@@ -20,9 +20,9 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
       case 'boolean':
         return (
           <div className="mt-2">
-            <label className="block text-sm font-medium text-gray-700">Default Value</label>
+            <label className="block text-sm font-medium text-gray-400">Default Value</label>
             <select
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
+              className="mt-1 block w-full bg-gray-750 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
               value={dimension.defaultValue ? 'true' : 'false'}
               onChange={(e) => handleFieldChange('defaultValue', e.target.value === 'true')}
             >
@@ -35,9 +35,9 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
       case 'categorical':
         return (
           <div className="mt-2">
-            <label className="block text-sm font-medium text-gray-700">Options (one per line)</label>
+            <label className="block text-sm font-medium text-gray-400">Options (one per line)</label>
             <textarea
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
+              className="mt-1 block w-full bg-gray-750 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
               rows="4"
               value={(dimension.options || []).join('\n')}
               onChange={(e) => handleFieldChange('options', e.target.value.split('\n').filter(Boolean))}
@@ -50,28 +50,28 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
           <>
             <div className="grid grid-cols-2 gap-4 mt-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Min Value</label>
+                <label className="block text-sm font-medium text-gray-400">Min Value</label>
                 <input
                   type="number"
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
+                  className="mt-1 block w-full bg-gray-750 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
                   value={dimension.min_value || ''}
                   onChange={(e) => handleFieldChange('min_value', parseFloat(e.target.value))}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Max Value</label>
+                <label className="block text-sm font-medium text-gray-400">Max Value</label>
                 <input
                   type="number"
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
+                  className="mt-1 block w-full bg-gray-750 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
                   value={dimension.max_value || ''}
                   onChange={(e) => handleFieldChange('max_value', parseFloat(e.target.value))}
                 />
               </div>
             </div>
             <div className="mt-2">
-              <label className="block text-sm font-medium text-gray-700">Distribution</label>
+              <label className="block text-sm font-medium text-gray-400">Distribution</label>
               <select
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
+                className="mt-1 block w-full bg-gray-750 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
                 value={dimension.distribution || 'uniform'}
                 onChange={(e) => handleFieldChange('distribution', e.target.value)}
               >
@@ -89,12 +89,12 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
   };
 
   return (
-    <div className="border rounded-md p-4 mb-4 bg-gray-50">
+    <div className="border border-gray-700 rounded-md p-4 mb-4 bg-gray-750">
       <div className="flex justify-between">
-        <h3 className="text-md font-medium">{dimension.name || 'New Dimension'}</h3>
+        <h3 className="text-md font-medium text-blue-300">{dimension.name || 'New Dimension'}</h3>
         <button 
           type="button"
-          className="text-red-600 hover:text-red-800"
+          className="text-red-400 hover:text-red-300"
           onClick={onRemove}
         >
           Remove
@@ -102,29 +102,29 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
       </div>
       
       <div className="mt-2">
-        <label className="block text-sm font-medium text-gray-700">Name</label>
+        <label className="block text-sm font-medium text-gray-400">Name</label>
         <input
           type="text"
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
+          className="mt-1 block w-full bg-gray-800 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
           value={dimension.name || ''}
           onChange={(e) => handleFieldChange('name', e.target.value)}
         />
       </div>
       
       <div className="mt-2">
-        <label className="block text-sm font-medium text-gray-700">Description</label>
+        <label className="block text-sm font-medium text-gray-400">Description</label>
         <input
           type="text"
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
+          className="mt-1 block w-full bg-gray-800 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
           value={dimension.description || ''}
           onChange={(e) => handleFieldChange('description', e.target.value)}
         />
       </div>
       
       <div className="mt-2">
-        <label className="block text-sm font-medium text-gray-700">Type</label>
+        <label className="block text-sm font-medium text-gray-400">Type</label>
         <select
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
+          className="mt-1 block w-full bg-gray-800 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
           value={dimension.type || ''}
           onChange={(e) => handleFieldChange('type', e.target.value)}
         >

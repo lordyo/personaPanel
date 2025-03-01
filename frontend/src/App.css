@@ -1,51 +1,9 @@
 /* Base styles */
 :root {
-  /* Solarized Dark Theme Colors */
-  --base03: #002b36;  /* Background */
-  --base02: #073642;  /* Card Background */
-  --base01: #586e75;  /* Content */
-  --base00: #657b83;  /* Content */
-  --base0: #839496;   /* Text */
-  --base1: #93a1a1;   /* Heading */
-  --base2: #eee8d5;   /* Highlight */
-  --base3: #fdf6e3;   /* Highlight */
-  --yellow: #b58900;  /* Primary Buttons */
-  --orange: #cb4b16;  /* Notifications */
-  --red: #dc322f;     /* Destructive */
-  --magenta: #d33682; /* Special */
-  --violet: #6c71c4;  /* Special */
-  --blue: #268bd2;    /* Interactive/Links */
-  --cyan: #2aa198;    /* Success */
-  --green: #859900;   /* Positive */
-  
-  /* Alias for common use */
-  --primary-color: var(--blue);
-  --secondary-color: var(--cyan);
-  --accent-color: var(--yellow);
-  --background-color: var(--base03);
-  --card-background: var(--base02);
-  --text-color: var(--base0);
-  --heading-color: var(--base1);
-  --border-color: rgba(131, 148, 150, 0.2);
-  --success-color: var(--green);
-  --error-color: var(--red);
-  --warning-color: var(--orange);
+  /* Dark theme with blue/purple accents - already defined in index.css */
 }
 
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: var(--background-color);
-  color: var(--text-color);
-  line-height: 1.6;
-}
-
-code, pre {
-  font-family: 'Fira Code', monospace;
-}
-
-/* App layout */
+/* App layout styles */
 .app {
   display: flex;
   flex-direction: column;
@@ -54,153 +12,77 @@ code, pre {
 
 .content {
   flex: 1;
-  padding: 20px;
-  background-color: var(--background-color);
+  padding: 1.5rem 0;
 }
 
-/* Navigation */
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 20px;
-  background-color: var(--base02);
-  color: var(--heading-color);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-.navbar-brand {
-  font-size: 1.5rem;
-  font-weight: bold;
-  padding: 1rem 0;
-  color: var(--heading-color);
-}
-
-.navbar-nav {
-  display: flex;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.nav-item {
-  margin-left: 1.5rem;
-}
-
-.nav-link {
-  color: var(--text-color);
-  text-decoration: none;
-  position: relative;
-  padding: 0.5rem 0;
-  transition: color 0.3s ease;
-}
-
+/* Custom Navigation Styling */
 .nav-link::after {
   content: '';
   position: absolute;
+  bottom: -2px;
+  left: 0;
   width: 0;
   height: 2px;
-  bottom: 0;
-  left: 0;
-  background-color: var(--primary-color);
+  background-color: var(--blue-400);
   transition: width 0.3s ease;
-}
-
-.nav-link:hover {
-  color: var(--primary-color);
 }
 
 .nav-link:hover::after {
   width: 100%;
 }
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
+.nav-link.active::after {
+  width: 100%;
 }
 
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
-}
-
-.feature-card {
-  background-color: var(--card-background);
-  padding: 1.5rem;
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  text-align: center;
-}
-
-.feature-card:hover {
+/* Card hover effects */
+.feature-card:hover,
+.entity-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
 }
 
-.feature-card h3 {
-  color: var(--heading-color);
-  margin-top: 0;
-  font-size: 1.4rem;
-}
-
-.feature-card p {
-  color: var(--text-color);
-  margin-bottom: 1.5rem;
-}
-
-.feature-card a {
-  display: inline-block;
-  background-color: var(--accent-color);
-  color: var(--base03);
-  padding: 0.6rem 1.2rem;
-  text-decoration: none;
-  border-radius: 4px;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-}
-
-.feature-card a:hover {
-  background-color: var(--orange);
-}
-
-h1 {
-  color: var(--heading-color);
-  font-size: 2.2rem;
-  margin-bottom: 1.5rem;
-  font-weight: 600;
-}
-
-.footer {
-  background-color: var(--card-background);
-  color: var(--text-color);
+/* Empty State and Error Message Styling */
+.empty-state {
   text-align: center;
-  padding: 1.5rem;
-  margin-top: 2rem;
-  font-size: 0.875rem;
+  padding: 3rem 1rem;
 }
 
-/* Responsive adjustments */
+.error-message {
+  color: var(--red-400);
+  border: 1px solid var(--red-400);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Animation utilities */
+.fadeIn {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.slideIn {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Custom App Styling - keeping only what's not handled by Tailwind or MUI */
+code, pre {
+  font-family: 'Fira Code', monospace;
+}
+
+/* Media Queries - only keeping necessary responsive adjustments */
 @media (max-width: 768px) {
-  .navbar {
-    flex-direction: column;
-    padding: 1rem;
-  }
-  
-  .navbar-nav {
-    flex-direction: column;
-    width: 100%;
-    margin-top: 1rem;
-  }
-  
-  .nav-item {
-    margin-left: 0;
-    margin-bottom: 0.5rem;
-  }
-  
   .feature-grid {
     grid-template-columns: 1fr;
   }

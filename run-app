@@ -1,31 +1,80 @@
 #!/bin/bash
+# Script to run the Entity Simulation Framework
 
-# Unset problematic environment variables
-unset PYTHONHOME
-unset PYTHONPATH
+# Display welcome message
+echo "Starting Entity Simulation Framework..."
 
-# Check if virtual environment exists
-if [ ! -d ".venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv .venv
+# Go to the project root directory
+cd "$(dirname "$0")"
+
+# Kill any existing backend servers
+if pgrep -f "python.*backend/scripts/run_server.py" > /dev/null; then
+  echo "Killing existing backend server processes..."
+  pkill -f "python.*backend/scripts/run_server.py"
+  sleep 1  # Give some time for processes to terminate
+  
+  # Check if any processes are still running
+  if pgrep -f "python.*backend/scripts/run_server.py" > /dev/null; then
+    echo "Forcefully terminating remaining processes..."
+    pkill -9 -f "python.*backend/scripts/run_server.py"
+    sleep 1
+  fi
+  
+  echo "Previous backend server processes have been terminated."
 fi
 
-# Activate virtual environment
-source .venv/bin/activate
+# Start the backend server in the background
+echo "Starting backend server..."
 
-# Install requirements if needed
-if [ -f "requirements.txt" ]; then
-    echo "Installing requirements..."
-    pip install -r requirements.txt
+# Check if venv exists in backend
+if [ ! -d "backend/venv" ]; then
+  echo "Creating virtual environment..."
+  cd backend
+  python3 -m venv venv
+  source venv/bin/activate
+  pip install -r ../requirements.txt
+  cd ..
 fi
 
-# Run the backend app
-echo "Starting backend application..."
-python backend/app.py
+# Run the server in the background
+cd backend
+source venv/bin/activate
+python3 scripts/run_server.py > ../backend.log 2>&1 &
+BACKEND_PID=$!
+echo "Backend server started with PID: $BACKEND_PID"
+cd ..
 
-# Deactivate virtual environment when done
-deactivate
+# Check if frontend dev server is already running
+if lsof -i :3000 > /dev/null; then
+  echo "Killing existing frontend development server..."
+  kill $(lsof -t -i:3000) 2>/dev/null || true
+  sleep 1
+  
+  # Force kill if still running
+  if lsof -i :3000 > /dev/null; then
+    echo "Forcefully terminating frontend server..."
+    kill -9 $(lsof -t -i:3000) 2>/dev/null || true
+    sleep 1
+  fi
+  
+  echo "Previous frontend server has been terminated."
+fi
 
-# If you need to run with Flask development server options,
-# uncomment the line below and comment the one above
-# FLASK_DEBUG=1 python3 backend/app.py 
+# Start the frontend in a new terminal window
+echo "Starting frontend..."
+cd frontend
+
+# Check if node_modules exists
+if [ ! -d "node_modules" ]; then
+  echo "Installing frontend dependencies..."
+  npm install
+fi
+
+# Start the development server
+echo "Starting React development server..."
+npm start
+
+# When the user stops the React app, also stop the backend
+trap "kill $BACKEND_PID 2>/dev/null" EXIT
+
+echo "Application stopped." 

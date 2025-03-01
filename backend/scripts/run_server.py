@@ -47,15 +47,32 @@ def main():
     # Check environment
     check_environment()
     
+    # Set environment variables to ensure CORS works properly
+    os.environ['FLASK_ENV'] = 'development'
+    os.environ['FLASK_DEBUG'] = 'True'
+    
     # Import app only after environment is configured
     from app import app
     
     # Get port from environment or use default
     port = int(os.environ.get('PORT', 5000))
     
-    # Run the app
+    # Set max content length on the app configuration
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max content size
+    
+    # Update server config for better header handling
+    from werkzeug.serving import WSGIRequestHandler
+    # Increase header size limit (default is often too small)
+    WSGIRequestHandler.protocol_version = "HTTP/1.1"
+    
+    # Run the app with optimized settings for development
     logger.info(f"Server starting on port {port}...")
-    app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true')
+    app.run(
+        host='0.0.0.0', 
+        port=port, 
+        debug=True,  # Enable debug mode for better error messages
+        threaded=True
+    )
 
 
 if __name__ == "__main__":

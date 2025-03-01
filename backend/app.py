@@ -33,7 +33,9 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+
+# Configure CORS properly - important for cross-origin requests
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Initialize database
 @app.before_first_request
@@ -199,6 +201,53 @@ def get_entity_type(entity_type_id):
         return error_response(f"Entity type with ID {entity_type_id} not found", 404)
     
     return success_response(entity_type)
+
+@app.route('/api/entity-types/<entity_type_id>', methods=['PUT'])
+@handle_exceptions
+def update_entity_type(entity_type_id):
+    """
+    Update an entity type by ID.
+    
+    Args:
+        entity_type_id: ID of the entity type
+    
+    Request body:
+        name: Name of the entity type
+        description: Description of the entity type
+        dimensions: List of dimension objects
+        
+    Returns:
+        JSON response with the updated entity type
+    """
+    data = request.json
+    
+    # Check if entity type exists
+    entity_type = storage.get_entity_type(entity_type_id)
+    if not entity_type:
+        return error_response(f"Entity type with ID {entity_type_id} not found", 404)
+    
+    # Validate required fields
+    if not data or not data.get('name') or not data.get('dimensions'):
+        return error_response("Name and dimensions are required")
+    
+    name = data['name']
+    description = data.get('description', '')
+    dimensions = data['dimensions']
+    
+    # Validate dimensions
+    if not isinstance(dimensions, list):
+        return error_response("Dimensions must be a list")
+    
+    for dim in dimensions:
+        if not dim.get('name') or not dim.get('type'):
+            return error_response("Each dimension must have a name and type")
+    
+    # Update the entity type
+    storage.update_entity_type(entity_type_id, name, description, dimensions)
+    logger.info(f"Updated entity type: {name} (ID: {entity_type_id})")
+    
+    updated_entity_type = storage.get_entity_type(entity_type_id)
+    return success_response(updated_entity_type)
 
 @app.route('/api/entities', methods=['POST'])
 @handle_exceptions

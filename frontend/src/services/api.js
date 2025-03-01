@@ -3,7 +3,7 @@
  * Contains functions for making requests to the API endpoints.
  */
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5001/api';
 
 /**
  * Make a GET request to the specified endpoint.
@@ -13,12 +13,36 @@ const API_URL = 'http://localhost:5000/api';
  */
 async function get(endpoint) {
   try {
-    const response = await fetch(`${API_URL}${endpoint}`);
-    const data = await response.json();
-    return data;
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
+      mode: 'cors',
+      credentials: 'omit'  // Don't send credentials
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    // Check if response is empty
+    const text = await response.text();
+    if (!text) {
+      return { status: 'error', message: 'Empty response received from server' };
+    }
+    
+    try {
+      const data = JSON.parse(text);
+      return data;
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return { status: 'error', message: 'Invalid JSON response from server' };
+    }
   } catch (error) {
     console.error(`Error fetching from ${endpoint}:`, error);
-    throw error;
+    return { status: 'error', message: error.message || 'Unknown error occurred' };
   }
 }
 
@@ -35,14 +59,33 @@ async function post(endpoint, body) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
+      mode: 'cors',
+      credentials: 'omit',  // Don't send credentials
       body: JSON.stringify(body),
     });
-    const data = await response.json();
-    return data;
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    // Check if response is empty
+    const text = await response.text();
+    if (!text) {
+      return { status: 'error', message: 'Empty response received from server' };
+    }
+    
+    try {
+      const data = JSON.parse(text);
+      return data;
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return { status: 'error', message: 'Invalid JSON response from server' };
+    }
   } catch (error) {
     console.error(`Error posting to ${endpoint}:`, error);
-    throw error;
+    return { status: 'error', message: error.message || 'Unknown error occurred' };
   }
 }
 
@@ -59,14 +102,33 @@ async function put(endpoint, body) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
+      mode: 'cors',
+      credentials: 'omit',  // Don't send credentials
       body: JSON.stringify(body),
     });
-    const data = await response.json();
-    return data;
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    // Check if response is empty
+    const text = await response.text();
+    if (!text) {
+      return { status: 'error', message: 'Empty response received from server' };
+    }
+    
+    try {
+      const data = JSON.parse(text);
+      return data;
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return { status: 'error', message: 'Invalid JSON response from server' };
+    }
   } catch (error) {
-    console.error(`Error putting to ${endpoint}:`, error);
-    throw error;
+    console.error(`Error updating ${endpoint}:`, error);
+    return { status: 'error', message: error.message || 'Unknown error occurred' };
   }
 }
 
@@ -130,6 +192,29 @@ const entityApi = {
    * @returns {Promise} - The created entity
    */
   create: (entity) => post('/entities', entity),
+  
+  /**
+   * Generate entities based on entity type.
+   * 
+   * @param {string} entityTypeId - The entity type id
+   * @param {number} count - Number of entities to generate (1-10)
+   * @param {string} variability - Variability level (low, medium, high)
+   * @returns {Promise} - The generated entities
+   */
+  generate: (entityTypeId, count, variability) => post('/entities', {
+    entity_type_id: entityTypeId,
+    count: count,
+    variability: variability
+  }),
+  
+  /**
+   * Update an existing entity.
+   * 
+   * @param {string} id - The entity id
+   * @param {object} entity - The updated entity data
+   * @returns {Promise} - The updated entity
+   */
+  update: (id, entity) => put(`/entities/${id}`, entity)
 }
 
 // Template Management
@@ -187,13 +272,39 @@ const simulationApi = {
 
 // Export a default API object with all the API functions
 const api = {
+  // Base methods
   get,
   post,
   put,
+  
+  // Higher-level methods for convenience
+  getEntityTypes: entityTypeApi.getAll,
+  getEntityType: entityTypeApi.getById,
+  createEntityType: entityTypeApi.create,
+  updateEntityType: entityTypeApi.update,
+  
+  getEntity: entityApi.getById,
+  getEntitiesByType: entityApi.getByType,
+  createEntity: entityApi.create,
+  updateEntity: entityApi.update,
+  generateEntities: entityApi.generate,
+  
+  getTemplates: templateApi.getAll,
+  getTemplate: templateApi.getById,
+  createEntityTypeFromTemplate: templateApi.createEntityType,
+  
+  getSimulations: simulationApi.getAll,
+  getSimulation: simulationApi.getById,
+  createSimulation: simulationApi.create,
+  
+  // Original API objects
   entityType: entityTypeApi,
   entity: entityApi,
   template: templateApi,
   simulation: simulationApi
 };
+
+// Export the API objects as named exports as well
+export { entityTypeApi, entityApi, templateApi, simulationApi };
 
 export default api; 
