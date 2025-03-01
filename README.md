@@ -53,6 +53,8 @@ cd entity-simulation-framework
 
 2. Install Python dependencies
 ```bash
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -70,14 +72,14 @@ Edit the `.env` file to include your LLM API keys and other configuration.
 
 5. Initialize the database
 ```bash
-python backend/scripts/init_db.py
+python backend/scripts/initialize_db.py
 ```
 
 ### Running the Application
 
 1. Start the backend server
 ```bash
-python backend/app.py
+python backend/scripts/run_server.py
 ```
 
 2. In another terminal, start the frontend development server
@@ -94,14 +96,18 @@ npm start
 entity-simulation-framework/
 ├── backend/                  # Python backend
 │   ├── app.py                # Main Flask application
-│   ├── config/               # Configuration files
-│   ├── controllers/          # API route handlers
-│   ├── models/               # Data models
-│   ├── scripts/              # Utility scripts
-│   └── services/             # Business logic
-│       ├── entity/           # Entity management services
-│       ├── llm/              # LLM integration services
-│       └── simulation/       # Simulation engine services
+│   ├── storage.py            # Database operations
+│   ├── core/                 # Core entity and simulation models
+│   │   ├── dimension.py      # Dimension types definition
+│   │   ├── entity.py         # Entity type and instance models
+│   │   ├── simulation.py     # Simulation engine
+│   │   └── templates.py      # Predefined entity templates
+│   ├── llm/                  # LLM integration
+│   │   ├── dspy_modules.py   # DSPy module implementation
+│   │   └── prompts.py        # Prompt templates
+│   └── scripts/              # Utility scripts
+│       ├── initialize_db.py  # Database initialization
+│       └── run_server.py     # Server startup script
 ├── frontend/                 # React frontend
 │   ├── public/               # Static assets
 │   └── src/                  # React source code
@@ -110,7 +116,8 @@ entity-simulation-framework/
 │       ├── services/         # API client services
 │       └── utils/            # Utility functions
 ├── data/                     # Data storage
-│   └── db.sqlite             # SQLite database (created on init)
+│   ├── cache/                # LLM response cache
+│   └── entity_sim.db         # SQLite database (created on init)
 ├── docs/                     # Documentation
 ├── tests/                    # Tests
 │   ├── backend/              # Backend tests
@@ -121,6 +128,36 @@ entity-simulation-framework/
 ├── run-app                   # Application runner script
 └── run-tests                 # Test runner script
 ```
+
+## Backend Infrastructure
+
+The backend infrastructure (Epic 4) includes the following components:
+
+### Database Schema
+
+- **SQLite Database**: Lightweight, file-based database stored in `data/entity_sim.db`
+- **Entity Types Table**: Stores entity type definitions with their dimensions
+- **Entities Table**: Stores entity instances with their attributes
+- **Contexts Table**: Stores simulation contexts
+- **Simulations Table**: Stores simulation results with references to entities and contexts
+- **Indices**: Performance optimized with appropriate indices
+
+### DSPy Module Implementation
+
+- **EntityGenerator**: Generates entity instances with attributes based on entity type dimensions
+- **SoloInteractionSimulator**: Simulates how a single entity responds to a context
+- **DyadicInteractionSimulator**: Simulates interactions between two entities in a context
+- **GroupInteractionSimulator**: Simulates group dynamics among multiple entities
+- **Caching Mechanism**: Response caching to reduce API usage
+- **Error Handling**: Robust error handling with retries for API failures
+
+### Flask API Server
+
+- **RESTful Endpoints**: Clean API design following REST principles
+- **CORS Support**: Configured for local development
+- **Error Handling**: Comprehensive error handling with informative responses
+- **Documentation**: Detailed docstrings for all API endpoints
+- **Response Formatting**: Consistent response format for success and error cases
 
 ## Documentation
 

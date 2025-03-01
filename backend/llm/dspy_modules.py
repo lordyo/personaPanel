@@ -5,6 +5,10 @@ This module defines the DSPy modules used for entity generation and simulation.
 """
 
 import dspy
+import os
+import json
+import time
+from functools import lru_cache
 from typing import Dict, List, Any, Optional
 from .prompts import (
     ENTITY_GENERATION_PROMPT, 
@@ -13,6 +17,43 @@ from .prompts import (
     GROUP_INTERACTION_PROMPT,
     format_entity_attributes
 )
+
+# Configure caching directory
+CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'cache')
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+# Configure retry parameters
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # seconds
+
+
+class LLMError(Exception):
+    """Exception raised for errors in LLM API calls."""
+    pass
+
+
+def retry_on_error(func):
+    """
+    Decorator to retry LLM API calls on failure.
+    
+    Args:
+        func: Function to decorate
+        
+    Returns:
+        Wrapped function with retry logic
+    """
+    def wrapper(*args, **kwargs):
+        retries = 0
+        while retries < MAX_RETRIES:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                retries += 1
+                if retries >= MAX_RETRIES:
+                    raise LLMError(f"Failed after {MAX_RETRIES} attempts: {str(e)}")
+                print(f"API call failed, retrying ({retries}/{MAX_RETRIES}): {str(e)}")
+                time.sleep(RETRY_DELAY * retries)  # Exponential backoff
+    return wrapper
 
 
 class EntityGenerator(dspy.Module):
@@ -27,7 +68,9 @@ class EntityGenerator(dspy.Module):
         self.generate = dspy.ChainOfThought(
             "entity_type, dimensions, variability -> name, attributes"
         )
-    
+        
+    @retry_on_error
+    @lru_cache(maxsize=100)  # Cache results for identical inputs
     def forward(self, entity_type: str, dimensions: List[Dict[str, Any]], variability: str = "medium") -> Dict[str, Any]:
         """
         Generate an entity instance based on the entity type and dimensions.
@@ -40,160 +83,159 @@ class EntityGenerator(dspy.Module):
         Returns:
             Dictionary with name and attributes for the generated entity
         """
-        prompt = ENTITY_GENERATION_PROMPT.format(
-            entity_type=entity_type,
-            dimensions=dimensions,
-            variability=variability
-        )
-        
-        result = self.generate(
-            entity_type=entity_type,
-            dimensions=dimensions,
-            variability=variability,
-            prompt=prompt
-        )
-        
-        # In a real implementation, this would parse and validate the result
-        return result
+        try:
+            # Convert dimensions to string for caching purposes
+            dimensions_str = str(dimensions)
+            
+            # Check if we have a cached result
+            cache_key = f"{entity_type}_{dimensions_str}_{variability}"
+            cache_file = os.path.join(CACHE_DIR, f"{hash(cache_key)}.json")
+            
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r') as f:
+                    return json.load(f)
+            
+            # Generate entity
+            prediction = self.generate(
+                entity_type=entity_type,
+                dimensions=dimensions,
+                variability=variability
+            )
+            
+            result = {
+                "name": prediction.name,
+                "attributes": prediction.attributes
+            }
+            
+            # Cache the result
+            with open(cache_file, 'w') as f:
+                json.dump(result, f)
+                
+            return result
+        except Exception as e:
+            raise LLMError(f"Entity generation failed: {str(e)}")
 
 
 class SoloInteractionSimulator(dspy.Module):
     """
-    DSPy module for simulating solo entity interactions with a context.
+    DSPy module for simulating solo entity interactions within a context.
     """
     
     def __init__(self):
         """
-        Initialize the solo interaction simulator module.
+        Initialize the solo interaction simulator.
         """
         self.simulate = dspy.ChainOfThought(
             "entity, context -> response"
         )
     
+    @retry_on_error
     def forward(self, entity: Dict[str, Any], context: str) -> str:
         """
-        Simulate a solo interaction between an entity and a context.
+        Simulate how an entity would interact within a given context.
         
         Args:
-            entity: Entity instance dictionary
-            context: Context description
+            entity: Dictionary containing entity details
+            context: Description of the context/scenario
             
         Returns:
-            Generated response for the entity in the context
+            String containing the simulation result
         """
-        # Format the entity attributes for the prompt
-        entity_attributes = format_entity_attributes(entity)
-        
-        # Create the prompt using the template
-        prompt = SOLO_INTERACTION_PROMPT.format(
-            entity=entity,
-            entity_attributes=entity_attributes,
-            context=context
-        )
-        
-        result = self.simulate(
-            entity=entity,
-            context=context,
-            prompt=prompt
-        )
-        
-        # Return the generated response
-        return result.response
+        try:
+            # Format entity attributes for prompt
+            entity_str = format_entity_attributes(entity)
+            
+            # Generate simulation response
+            prediction = self.simulate(
+                entity=entity_str,
+                context=context
+            )
+            
+            return prediction.response
+        except Exception as e:
+            raise LLMError(f"Solo interaction simulation failed: {str(e)}")
 
 
 class DyadicInteractionSimulator(dspy.Module):
     """
-    DSPy module for simulating interactions between two entities in a context.
+    DSPy module for simulating interactions between two entities within a context.
     """
     
     def __init__(self):
         """
-        Initialize the dyadic interaction simulator module.
+        Initialize the dyadic interaction simulator.
         """
         self.simulate = dspy.ChainOfThought(
-            "entity1, entity2, context -> conversation"
+            "entity1, entity2, context -> response"
         )
     
+    @retry_on_error
     def forward(self, entity1: Dict[str, Any], entity2: Dict[str, Any], context: str) -> str:
         """
-        Simulate an interaction between two entities in a context.
+        Simulate how two entities would interact within a given context.
         
         Args:
-            entity1: First entity instance dictionary
-            entity2: Second entity instance dictionary
-            context: Context description
+            entity1: Dictionary containing first entity details
+            entity2: Dictionary containing second entity details
+            context: Description of the context/scenario
             
         Returns:
-            Generated conversation between the two entities
+            String containing the simulation result
         """
-        # Format the entity attributes for the prompt
-        entity1_attributes = format_entity_attributes(entity1)
-        entity2_attributes = format_entity_attributes(entity2)
-        
-        # Create the prompt using the template
-        prompt = DYADIC_INTERACTION_PROMPT.format(
-            entity1=entity1,
-            entity1_attributes=entity1_attributes,
-            entity2=entity2,
-            entity2_attributes=entity2_attributes,
-            context=context
-        )
-        
-        result = self.simulate(
-            entity1=entity1,
-            entity2=entity2,
-            context=context,
-            prompt=prompt
-        )
-        
-        # Return the generated conversation
-        return result.conversation
+        try:
+            # Format entity attributes for prompt
+            entity1_str = format_entity_attributes(entity1)
+            entity2_str = format_entity_attributes(entity2)
+            
+            # Generate simulation response
+            prediction = self.simulate(
+                entity1=entity1_str,
+                entity2=entity2_str,
+                context=context
+            )
+            
+            return prediction.response
+        except Exception as e:
+            raise LLMError(f"Dyadic interaction simulation failed: {str(e)}")
 
 
 class GroupInteractionSimulator(dspy.Module):
     """
-    DSPy module for simulating group interactions among multiple entities in a context.
+    DSPy module for simulating interactions among multiple entities within a context.
     """
     
     def __init__(self):
         """
-        Initialize the group interaction simulator module.
+        Initialize the group interaction simulator.
         """
         self.simulate = dspy.ChainOfThought(
-            "entities, context -> discussion"
+            "entities, context -> response"
         )
     
+    @retry_on_error
     def forward(self, entities: List[Dict[str, Any]], context: str) -> str:
         """
-        Simulate a group interaction among multiple entities in a context.
+        Simulate how multiple entities would interact within a given context.
         
         Args:
-            entities: List of entity instance dictionaries
-            context: Context description
+            entities: List of dictionaries containing entity details
+            context: Description of the context/scenario
             
         Returns:
-            Generated group discussion
+            String containing the simulation result
         """
-        # Create a formatted string of all entities with their attributes
-        entity_details = []
-        for i, entity in enumerate(entities):
-            entity_detail = f"Entity {i+1}: {entity['name']}\n"
-            entity_detail += format_entity_attributes(entity)
-            entity_details.append(entity_detail)
-        
-        entity_details_str = "\n\n".join(entity_details)
-        
-        # Create the prompt using the template
-        prompt = GROUP_INTERACTION_PROMPT.format(
-            entity_details=entity_details_str,
-            context=context
-        )
-        
-        result = self.simulate(
-            entities=entities,
-            context=context,
-            prompt=prompt
-        )
-        
-        # Return the generated discussion
-        return result.discussion 
+        try:
+            # Format entities for prompt
+            entities_str = ""
+            for i, entity in enumerate(entities):
+                entities_str += f"Entity {i+1}: {format_entity_attributes(entity)}\n\n"
+            
+            # Generate simulation response
+            prediction = self.simulate(
+                entities=entities_str,
+                context=context
+            )
+            
+            return prediction.response
+        except Exception as e:
+            raise LLMError(f"Group interaction simulation failed: {str(e)}") 

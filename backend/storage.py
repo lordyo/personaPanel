@@ -34,9 +34,13 @@ def init_db():
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT,
-        dimensions TEXT NOT NULL  -- JSON string
+        dimensions TEXT NOT NULL,  -- JSON string
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
     ''')
+    
+    # Create indices for entity_types
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_entity_types_name ON entity_types(name)')
     
     # Create entities table
     cursor.execute('''
@@ -45,16 +49,22 @@ def init_db():
         entity_type_id TEXT NOT NULL,
         name TEXT NOT NULL,
         attributes TEXT NOT NULL,  -- JSON string
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (entity_type_id) REFERENCES entity_types (id)
     )
     ''')
+    
+    # Create indices for entities
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_entities_entity_type_id ON entities(entity_type_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)')
     
     # Create contexts table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS contexts (
         id TEXT PRIMARY KEY,
         description TEXT NOT NULL,
-        metadata TEXT  -- JSON string
+        metadata TEXT,  -- JSON string
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
     ''')
     
@@ -71,6 +81,10 @@ def init_db():
         FOREIGN KEY (context_id) REFERENCES contexts (id)
     )
     ''')
+    
+    # Create indices for simulations
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_simulations_context_id ON simulations(context_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_simulations_timestamp ON simulations(timestamp)')
     
     conn.commit()
     conn.close()
@@ -95,8 +109,8 @@ def save_entity_type(name: str, description: str, dimensions: List[Dict[str, Any
     
     entity_type_id = str(uuid.uuid4())
     cursor.execute(
-        'INSERT INTO entity_types VALUES (?, ?, ?, ?)',
-        (entity_type_id, name, description, json.dumps(dimensions))
+        'INSERT INTO entity_types VALUES (?, ?, ?, ?, ?)',
+        (entity_type_id, name, description, json.dumps(dimensions), datetime.datetime.now().isoformat())
     )
     
     conn.commit()
@@ -129,7 +143,8 @@ def get_entity_type(entity_type_id: str) -> Optional[Dict[str, Any]]:
         'id': row[0],
         'name': row[1],
         'description': row[2],
-        'dimensions': json.loads(row[3])
+        'dimensions': json.loads(row[3]),
+        'created_at': row[4]
     }
 
 
@@ -154,7 +169,8 @@ def get_all_entity_types() -> List[Dict[str, Any]]:
             'id': row[0],
             'name': row[1],
             'description': row[2],
-            'dimensions': json.loads(row[3])
+            'dimensions': json.loads(row[3]),
+            'created_at': row[4]
         })
     
     return entity_types
@@ -179,8 +195,8 @@ def save_entity(entity_type_id: str, name: str, attributes: Dict[str, Any]) -> s
     
     entity_id = str(uuid.uuid4())
     cursor.execute(
-        'INSERT INTO entities VALUES (?, ?, ?, ?)',
-        (entity_id, entity_type_id, name, json.dumps(attributes))
+        'INSERT INTO entities VALUES (?, ?, ?, ?, ?)',
+        (entity_id, entity_type_id, name, json.dumps(attributes), datetime.datetime.now().isoformat())
     )
     
     conn.commit()
@@ -213,7 +229,8 @@ def get_entity(entity_id: str) -> Optional[Dict[str, Any]]:
         'id': row[0],
         'entity_type_id': row[1],
         'name': row[2],
-        'attributes': json.loads(row[3])
+        'attributes': json.loads(row[3]),
+        'created_at': row[4]
     }
 
 
@@ -241,7 +258,8 @@ def get_entities_by_type(entity_type_id: str) -> List[Dict[str, Any]]:
             'id': row[0],
             'entity_type_id': row[1],
             'name': row[2],
-            'attributes': json.loads(row[3])
+            'attributes': json.loads(row[3]),
+            'created_at': row[4]
         })
     
     return entities
@@ -265,8 +283,8 @@ def save_context(description: str, metadata: Optional[Dict[str, Any]] = None) ->
     
     context_id = str(uuid.uuid4())
     cursor.execute(
-        'INSERT INTO contexts VALUES (?, ?, ?)',
-        (context_id, description, json.dumps(metadata) if metadata else None)
+        'INSERT INTO contexts VALUES (?, ?, ?, ?)',
+        (context_id, description, json.dumps(metadata) if metadata else None, datetime.datetime.now().isoformat())
     )
     
     conn.commit()
@@ -298,7 +316,8 @@ def get_context(context_id: str) -> Optional[Dict[str, Any]]:
     return {
         'id': row[0],
         'description': row[1],
-        'metadata': json.loads(row[2]) if row[2] else None
+        'metadata': json.loads(row[2]) if row[2] else None,
+        'created_at': row[3]
     }
 
 
