@@ -1,0 +1,164 @@
+[
+  {
+    "name": "Human",
+    "description": "A human entity with basic demographic and psychological traits",
+    "dimensions": [
+      {
+        "name": "age",
+        "description": "The age of the human in years",
+        "type": "numerical",
+        "min_value": 18,
+        "max_value": 80,
+        "distribution": "normal"
+      },
+      {
+        "name": "gender",
+        "description": "The gender identity of the human",
+        "type": "categorical",
+        "options": ["male", "female", "non-binary"]
+      },
+      {
+        "name": "occupation",
+        "description": "The primary occupation or profession of the human",
+        "type": "text"
+      },
+      {
+        "name": "extroversion",
+        "description": "How extroverted or introverted the person is",
+        "type": "numerical",
+        "min_value": 1,
+        "max_value": 10,
+        "distribution": "uniform"
+      },
+      {
+        "name": "openness",
+        "description": "How open to new experiences the person is",
+        "type": "numerical",
+        "min_value": 1,
+        "max_value": 10,
+        "distribution": "uniform"
+      },
+      {
+        "name": "conscientiousness",
+        "description": "How conscientious and organized the person is",
+        "type": "numerical",
+        "min_value": 1,
+        "max_value": 10,
+        "distribution": "uniform"
+      },
+      {
+        "name": "education_level",
+        "description": "The highest level of education completed",
+        "type": "categorical",
+        "options": ["high school", "bachelor's degree", "master's degree", "doctorate", "other"]
+      },
+      {
+        "name": "is_married",
+        "description": "Whether the person is currently married",
+        "type": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "Fantasy Character",
+    "description": "A character from a fantasy world with magical abilities and backstory",
+    "dimensions": [
+      {
+        "name": "race",
+        "description": "The fantasy race of the character",
+        "type": "categorical",
+        "options": ["human", "elf", "dwarf", "orc", "halfling", "gnome", "other"]
+      },
+      {
+        "name": "class",
+        "description": "The character's role or profession in the fantasy world",
+        "type": "categorical",
+        "options": ["warrior", "mage", "rogue", "cleric", "bard", "ranger", "paladin", "other"]
+      },
+      {
+        "name": "age",
+        "description": "The age of the character in years",
+        "type": "numerical",
+        "min_value": 18,
+        "max_value": 500,
+        "distribution": "exponential"
+      },
+      {
+        "name": "magical_ability",
+        "description": "How powerful the character's magical abilities are",
+        "type": "numerical",
+        "min_value": 0,
+        "max_value": 10,
+        "distribution": "uniform"
+      },
+      {
+        "name": "background",
+        "description": "The character's backstory and origin",
+        "type": "text"
+      },
+      {
+        "name": "alignment",
+        "description": "The character's moral and ethical alignment",
+        "type": "categorical",
+        "options": ["lawful good", "neutral good", "chaotic good", "lawful neutral", "true neutral", "chaotic neutral", "lawful evil", "neutral evil", "chaotic evil"]
+      },
+      {
+        "name": "has_magical_item",
+        "description": "Whether the character possesses a significant magical item",
+        "type": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "Organization",
+    "description": "An organization or institution with defined characteristics",
+    "dimensions": [
+      {
+        "name": "type",
+        "description": "The type of organization",
+        "type": "categorical",
+        "options": ["corporation", "non-profit", "government", "educational", "religious", "criminal", "other"]
+      },
+      {
+        "name": "size",
+        "description": "The approximate number of people in the organization",
+        "type": "numerical",
+        "min_value": 5,
+        "max_value": 100000,
+        "distribution": "logarithmic"
+      },
+      {
+        "name": "age",
+        "description": "How long the organization has existed in years",
+        "type": "numerical",
+        "min_value": 1,
+        "max_value": 200,
+        "distribution": "uniform"
+      },
+      {
+        "name": "mission",
+        "description": "The primary mission or purpose of the organization",
+        "type": "text"
+      },
+      {
+        "name": "hierarchy",
+        "description": "How hierarchical the organization's structure is",
+        "type": "numerical",
+        "min_value": 1,
+        "max_value": 10,
+        "distribution": "uniform"
+      },
+      {
+        "name": "public_facing",
+        "description": "Whether the organization is public-facing or secretive",
+        "type": "boolean"
+      },
+      {
+        "name": "geographic_reach",
+        "description": "The geographic scope of the organization",
+        "type": "categorical",
+        "options": ["local", "regional", "national", "international", "global"]
+      }
+    ]
+  }
+] 

@@ -1,7 +1,5 @@
 """
-PersonaPanel Backend
+Entity Simulation Framework Backend
 
-A comprehensive application for managing and interacting with different AI personas.
-"""
-
-__version__ = "0.1.0" 
+This package contains the backend implementation of the Entity Simulation Framework.
+""" 
