@@ -24,6 +24,9 @@ const EntityTypeEdit = () => {
   const [nameError, setNameError] = useState('');
   const [dimensionsError, setDimensionsError] = useState('');
 
+  // Store raw option input for categorical dimensions
+  const [rawOptions, setRawOptions] = useState({});
+
   useEffect(() => {
     const fetchEntityType = async () => {
       try {
@@ -150,6 +153,19 @@ const EntityTypeEdit = () => {
       [field]: value
     };
     setDimensions(newDimensions);
+  };
+
+  // Helper function to handle categorical options input
+  const handleOptionsChange = (index, value) => {
+    // Update raw options state
+    setRawOptions({
+      ...rawOptions,
+      [index]: value
+    });
+    
+    // Process the options and update dimension
+    const options = value.split(',').map(item => item.trim()).filter(Boolean);
+    handleDimensionChange(index, 'options', options);
   };
 
   if (loading) {
@@ -320,14 +336,14 @@ const EntityTypeEdit = () => {
                     {dimension.type === 'categorical' && (
                       <div>
                         <label className="block text-gray-400 text-sm font-medium mb-2">
-                          Options * (one per line)
+                          Options * (separate with commas)
                         </label>
                         <textarea 
-                          value={(dimension.options || []).join('\n')}
-                          onChange={(e) => handleDimensionChange(index, 'options', e.target.value.split('\n').filter(Boolean))}
+                          value={rawOptions[index] || (dimension.options || []).join(', ')}
+                          onChange={(e) => handleOptionsChange(index, e.target.value)}
                           className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
                           rows="4"
-                          placeholder="Enter options, one per line"
+                          placeholder="Enter options separated by commas (e.g. Red, Green, Blue)"
                         />
                       </div>
                     )}

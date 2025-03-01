@@ -253,17 +253,18 @@ def update_entity_type(entity_type_id):
 @handle_exceptions
 def create_entity():
     """
-    Create a new entity instance.
+    Create a new entity instance or multiple instances.
     
     Request body:
         entity_type_id: ID of the entity type
-        name: Name of the entity
-        attributes: Dictionary of attribute values
-        generate: Boolean indicating whether to generate attributes using LLM
-        variability: Variability level for generation (low, medium, high)
+        name: Name of the entity (when not generating)
+        attributes: Dictionary of attribute values (when not generating)
+        generate: Boolean indicating whether to generate attributes using LLM (default: False)
+        variability: Variability level for generation (low, medium, high) (default: 'medium')
+        count: Number of entities to generate (when generate is True, default: 1)
         
     Returns:
-        JSON response with the created entity ID
+        JSON response with the created entity ID(s)
     """
     data = request.json
     
@@ -277,7 +278,14 @@ def create_entity():
     if not entity_type:
         return error_response(f"Entity type with ID {entity_type_id} not found", 404)
     
-    # If 'generate' is true, use LLM to generate entity
+    # Get count (for batch generation)
+    count = int(data.get('count', 1))
+    
+    # Validate count
+    if count < 1 or count > 20:
+        return error_response("Count must be between 1 and 20")
+    
+    # If 'generate' is true, use LLM to generate entity/entities
     if data.get('generate', False):
         if not lm:
             return error_response("LLM is not configured", 503)
@@ -286,27 +294,44 @@ def create_entity():
         if variability not in ['low', 'medium', 'high']:
             return error_response("Variability must be 'low', 'medium', or 'high'")
         
-        generator = EntityGenerator()
-        generated = generator.forward(
-            entity_type['name'],
-            entity_type['dimensions'],
-            variability
-        )
+        # For batch generation
+        entity_ids = []
         
-        name = generated['name']
-        attributes = generated['attributes']
+        try:
+            generator = EntityGenerator()
+            
+            # Generate specified number of entities
+            for i in range(count):
+                generated = generator.forward(
+                    entity_type['name'],
+                    entity_type['dimensions'],
+                    variability
+                )
+                
+                name = generated['name']
+                attributes = generated['attributes']
+                
+                entity_id = storage.save_entity(entity_type_id, name, attributes)
+                entity_ids.append(entity_id)
+                logger.info(f"Created generated entity: {name} (ID: {entity_id})")
+            
+            return success_response({"ids": entity_ids}, 201)
+            
+        except Exception as e:
+            logger.error(f"Error in batch entity generation: {str(e)}")
+            return error_response(f"Failed to generate entities: {str(e)}", 500)
     else:
-        # Use provided name and attributes
+        # Use provided name and attributes (single entity only)
         name = data.get('name')
         attributes = data.get('attributes', {})
         
         if not name:
             return error_response("Name is required when not generating")
     
-    entity_id = storage.save_entity(entity_type_id, name, attributes)
-    logger.info(f"Created entity: {name} (ID: {entity_id})")
+        entity_id = storage.save_entity(entity_type_id, name, attributes)
+        logger.info(f"Created entity: {name} (ID: {entity_id})")
     
-    return success_response({"id": entity_id}, 201)
+        return success_response({"id": entity_id}, 201)
 
 @app.route('/api/entities/<entity_id>', methods=['GET'])
 @handle_exceptions
@@ -532,12 +557,35 @@ def create_entity_type_from_template(template_id):
     
     name = data.get('name', template.get('name', template_id))
     description = data.get('description', template.get('description', ''))
-    dimensions = template.get('dimensions', [])
     
-    entity_type_id = storage.save_entity_type(name, description, dimensions)
-    logger.info(f"Created entity type from template {template_id}: {name} (ID: {entity_type_id})")
+    # Use dimensions from the request if provided, otherwise use template dimensions
+    if 'dimensions' in data and isinstance(data['dimensions'], list):
+        logger.info(f"Using custom dimensions from request for template {template_id}")
+        dimensions = data['dimensions']
+        
+        # Ensure dimensions are in the correct format
+        for dimension in dimensions:
+            # Convert camelCase to snake_case for backend compatibility
+            if 'minValue' in dimension and 'min_value' not in dimension:
+                dimension['min_value'] = dimension.pop('minValue')
+            if 'maxValue' in dimension and 'max_value' not in dimension:
+                dimension['max_value'] = dimension.pop('maxValue')
+    else:
+        logger.info(f"Using default dimensions from template {template_id}")
+        dimensions = template.get('dimensions', [])
+        
+        # Convert Dimension objects to dictionaries if needed
+        if dimensions and hasattr(dimensions[0], '__dict__'):
+            dimensions = [d.__dict__ for d in dimensions]
     
-    return success_response({"id": entity_type_id}, 201)
+    try:
+        entity_type_id = storage.save_entity_type(name, description, dimensions)
+        logger.info(f"Created entity type from template {template_id}: {name} (ID: {entity_type_id})")
+        
+        return success_response({"id": entity_type_id}, 201)
+    except Exception as e:
+        logger.error(f"Error creating entity type from template: {str(e)}\n{traceback.format_exc()}")
+        return error_response(f"Error creating entity type: {str(e)}", 500)
 
 if __name__ == '__main__':
     # Use environment variable for port or default to 5001 (avoiding common 5000 port)

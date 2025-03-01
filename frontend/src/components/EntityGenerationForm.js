@@ -29,8 +29,8 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
       return;
     }
     
-    if (count < 1 || count > 100) {
-      setError('Count must be between 1 and 100.');
+    if (count < 1 || count > 20) {
+      setError('Count must be between 1 and 20.');
       return;
     }
     
@@ -82,15 +82,15 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
           id="count"
           type="range"
           min="1"
-          max="100"
+          max="20"
           value={count}
           onChange={(e) => setCount(parseInt(e.target.value))}
           className="w-full"
         />
         <div className="flex justify-between text-xs text-gray-500 mt-1">
           <span>1</span>
-          <span>50</span>
-          <span>100</span>
+          <span>10</span>
+          <span>20</span>
         </div>
       </div>
       

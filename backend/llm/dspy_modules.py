@@ -70,7 +70,6 @@ class EntityGenerator(dspy.Module):
         )
         
     @retry_on_error
-    @lru_cache(maxsize=100)  # Cache results for identical inputs
     def forward(self, entity_type: str, dimensions: List[Dict[str, Any]], variability: str = "medium") -> Dict[str, Any]:
         """
         Generate an entity instance based on the entity type and dimensions.
@@ -84,16 +83,20 @@ class EntityGenerator(dspy.Module):
             Dictionary with name and attributes for the generated entity
         """
         try:
-            # Convert dimensions to string for caching purposes
-            dimensions_str = str(dimensions)
+            # Convert dimensions to a JSON string for stable hashing
+            dimensions_str = json.dumps(dimensions, sort_keys=True)
             
-            # Check if we have a cached result
+            # Create a hash-safe cache key
             cache_key = f"{entity_type}_{dimensions_str}_{variability}"
-            cache_file = os.path.join(CACHE_DIR, f"{hash(cache_key)}.json")
+            cache_file = os.path.join(CACHE_DIR, f"{abs(hash(cache_key) % 10**10)}.json")
             
             if os.path.exists(cache_file):
-                with open(cache_file, 'r') as f:
-                    return json.load(f)
+                try:
+                    with open(cache_file, 'r') as f:
+                        return json.load(f)
+                except Exception as e:
+                    print(f"Error reading cache file: {e}")
+                    # Continue with generation if cache read fails
             
             # Generate entity
             prediction = self.generate(
@@ -108,8 +111,12 @@ class EntityGenerator(dspy.Module):
             }
             
             # Cache the result
-            with open(cache_file, 'w') as f:
-                json.dump(result, f)
+            try:
+                with open(cache_file, 'w') as f:
+                    json.dump(result, f)
+            except Exception as e:
+                print(f"Error writing to cache file: {e}")
+                # Continue even if caching fails
                 
             return result
         except Exception as e:

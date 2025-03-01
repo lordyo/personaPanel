@@ -197,14 +197,15 @@ const entityApi = {
    * Generate entities based on entity type.
    * 
    * @param {string} entityTypeId - The entity type id
-   * @param {number} count - Number of entities to generate (1-10)
+   * @param {number} count - Number of entities to generate (1-20)
    * @param {string} variability - Variability level (low, medium, high)
    * @returns {Promise} - The generated entities
    */
   generate: (entityTypeId, count, variability) => post('/entities', {
     entity_type_id: entityTypeId,
     count: count,
-    variability: variability
+    variability: variability,
+    generate: true
   }),
   
   /**

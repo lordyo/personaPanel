@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * Component for rendering a form to edit a single dimension.
@@ -10,8 +10,30 @@ import React from 'react';
  * @returns {JSX.Element} - Rendered component
  */
 const DimensionForm = ({ dimension, onChange, onRemove }) => {
+  // State to track raw options input for categorical dimensions
+  const [rawOptionsInput, setRawOptionsInput] = useState(
+    dimension.type === 'categorical' ? (dimension.options || []).join(', ') : ''
+  );
+
+  // Update raw options input when dimension.options changes externally
+  useEffect(() => {
+    if (dimension.type === 'categorical') {
+      setRawOptionsInput((dimension.options || []).join(', '));
+    }
+  }, [dimension.options, dimension.type]);
+
   const handleFieldChange = (field, value) => {
     onChange({ ...dimension, [field]: value });
+  };
+
+  // Handle change in dimension type
+  const handleTypeChange = (type) => {
+    handleFieldChange('type', type);
+    
+    // Reset options input if switching to categorical
+    if (type === 'categorical') {
+      setRawOptionsInput('');
+    }
   };
 
   // Render different controls based on dimension type
@@ -35,12 +57,22 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
       case 'categorical':
         return (
           <div className="mt-2">
-            <label className="block text-sm font-medium text-gray-400">Options (one per line)</label>
+            <label className="block text-sm font-medium text-gray-400">Options (separate with commas)</label>
             <textarea
               className="mt-1 block w-full bg-gray-750 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
               rows="4"
-              value={(dimension.options || []).join('\n')}
-              onChange={(e) => handleFieldChange('options', e.target.value.split('\n').filter(Boolean))}
+              value={rawOptionsInput}
+              onChange={(e) => {
+                // Store raw input
+                setRawOptionsInput(e.target.value);
+                
+                // Process options
+                const options = e.target.value.split(',')
+                  .map(item => item.trim())
+                  .filter(Boolean);
+                handleFieldChange('options', options);
+              }}
+              placeholder="Enter options separated by commas (e.g. Red, Green, Blue)"
             />
           </div>
         );
@@ -126,7 +158,7 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
         <select
           className="mt-1 block w-full bg-gray-800 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-gray-300 focus:outline-none focus:border-blue-500"
           value={dimension.type || ''}
-          onChange={(e) => handleFieldChange('type', e.target.value)}
+          onChange={(e) => handleTypeChange(e.target.value)}
         >
           <option value="">Select a type</option>
           <option value="boolean">Boolean</option>
