@@ -96,7 +96,7 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
       
       <div className="mb-6">
         <label className="block text-gray-400 text-sm font-medium mb-2" htmlFor="variability">
-          Variability ({Math.round(variability * 100)}%)
+          Variability ({variability < 0.33 ? 'Low' : variability < 0.67 ? 'Medium' : 'High'})
         </label>
         <input
           id="variability"

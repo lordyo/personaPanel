@@ -470,4 +470,62 @@ def get_all_simulations() -> List[Dict[str, Any]]:
             'metadata': json.loads(row[6]) if row[6] else None
         })
     
-    return simulations 
+    return simulations
+
+
+def delete_entity(entity_id: str) -> bool:
+    """
+    Delete a specific entity by ID.
+    
+    Args:
+        entity_id: The ID of the entity to delete
+        
+    Returns:
+        True if the entity was deleted, False if the entity was not found
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if entity exists
+        cursor.execute('SELECT id FROM entities WHERE id = ?', (entity_id,))
+        if cursor.fetchone() is None:
+            return False
+        
+        # Delete the entity
+        cursor.execute('DELETE FROM entities WHERE id = ?', (entity_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error deleting entity: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
+def delete_entities_by_type(entity_type_id: str) -> int:
+    """
+    Delete all entities of a specific entity type.
+    
+    Args:
+        entity_type_id: The ID of the entity type
+        
+    Returns:
+        The number of entities deleted
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Delete all entities of the specified type
+        cursor.execute('DELETE FROM entities WHERE entity_type_id = ?', (entity_type_id,))
+        deleted_count = cursor.rowcount
+        conn.commit()
+        return deleted_count
+    except Exception as e:
+        print(f"Error deleting entities by type: {e}")
+        conn.rollback()
+        return 0
+    finally:
+        conn.close() 

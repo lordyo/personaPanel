@@ -1,0 +1,1 @@
+{"name": "Computer System with Age and Type", "attributes": "- Age: A numerical attribute ranging from 1 to 50 years, indicating the system's age.\n- Type: A categorical attribute with options including Household, Combat, and Research, defining the system's primary function."}

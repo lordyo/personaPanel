@@ -587,6 +587,48 @@ def create_entity_type_from_template(template_id):
         logger.error(f"Error creating entity type from template: {str(e)}\n{traceback.format_exc()}")
         return error_response(f"Error creating entity type: {str(e)}", 500)
 
+@app.route('/api/entities/<entity_id>', methods=['DELETE'])
+@handle_exceptions
+def delete_entity(entity_id):
+    """
+    Delete an entity by ID.
+    
+    Args:
+        entity_id: ID of the entity to delete
+        
+    Returns:
+        JSON response indicating success or failure
+    """
+    result = storage.delete_entity(entity_id)
+    
+    if result:
+        logger.info(f"Deleted entity with ID: {entity_id}")
+        return success_response({"deleted": True})
+    else:
+        return error_response(f"Entity with ID {entity_id} not found or could not be deleted", 404)
+
+@app.route('/api/entity-types/<entity_type_id>/entities', methods=['DELETE'])
+@handle_exceptions
+def delete_entities_by_type(entity_type_id):
+    """
+    Delete all entities of a specific entity type.
+    
+    Args:
+        entity_type_id: ID of the entity type
+        
+    Returns:
+        JSON response with the number of entities deleted
+    """
+    # Check if entity type exists
+    entity_type = storage.get_entity_type(entity_type_id)
+    if not entity_type:
+        return error_response(f"Entity type with ID {entity_type_id} not found", 404)
+    
+    count = storage.delete_entities_by_type(entity_type_id)
+    logger.info(f"Deleted {count} entities of type: {entity_type_id}")
+    
+    return success_response({"count": count})
+
 if __name__ == '__main__':
     # Use environment variable for port or default to 5001 (avoiding common 5000 port)
     port = int(os.environ.get('PORT', 5001))

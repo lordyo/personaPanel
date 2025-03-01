@@ -23,6 +23,8 @@ const EntityList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTypeId, setFilterTypeId] = useState('');
   const [error, setError] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // {id, name} for single entity or {typeId, typeName} for all of a type
+  const [deleting, setDeleting] = useState(false);
   
   // Fetch entity types and entities on component mount
   useEffect(() => {
@@ -139,7 +141,11 @@ const EntityList = () => {
       setGeneratingEntities(true);
       setError(null);
       
-      const response = await api.generateEntities(formData);
+      const response = await api.generateEntities(
+        formData.entityTypeId,
+        formData.count,
+        formData.variability
+      );
       
       if (response.status === 'success') {
         // Refresh the entities list
@@ -167,6 +173,79 @@ const EntityList = () => {
   const handleClearFilters = () => {
     setSearchTerm('');
     setFilterTypeId('');
+  };
+  
+  const handleDeleteEntity = async (entityId) => {
+    // Find the entity to show its name in the confirmation
+    const entityToDelete = entities.find(e => e.id === entityId);
+    if (!entityToDelete) return;
+    
+    // Set up confirmation dialog
+    setDeleteConfirmation({
+      id: entityId,
+      name: entityToDelete.name,
+      isAll: false
+    });
+  };
+  
+  const handleDeleteAllEntities = async () => {
+    if (!filterTypeId) return;
+    
+    // Find the entity type name
+    const entityType = entityTypes.find(type => type.id === filterTypeId);
+    if (!entityType) return;
+    
+    // Set up confirmation dialog for deleting all entities of this type
+    setDeleteConfirmation({
+      typeId: filterTypeId,
+      typeName: entityType.name,
+      isAll: true
+    });
+  };
+  
+  const confirmDelete = async () => {
+    try {
+      setDeleting(true);
+      
+      if (deleteConfirmation.isAll) {
+        // Delete all entities of a type
+        const response = await api.deleteEntitiesByType(deleteConfirmation.typeId);
+        
+        if (response.status === 'success') {
+          // Update the entities list by removing all entities of this type
+          setEntities(prev => prev.filter(e => e.entity_type_id !== deleteConfirmation.typeId));
+          setFilteredEntities(prev => prev.filter(e => e.entity_type_id !== deleteConfirmation.typeId));
+          setSelectedEntityIds(prev => prev.filter(id => {
+            const entity = entities.find(e => e.id === id);
+            return entity && entity.entity_type_id !== deleteConfirmation.typeId;
+          }));
+        } else {
+          setError(`Failed to delete entities: ${response.message}`);
+        }
+      } else {
+        // Delete a single entity
+        const response = await api.deleteEntity(deleteConfirmation.id);
+        
+        if (response.status === 'success') {
+          // Update the entities list
+          setEntities(prev => prev.filter(e => e.id !== deleteConfirmation.id));
+          setFilteredEntities(prev => prev.filter(e => e.id !== deleteConfirmation.id));
+          setSelectedEntityIds(prev => prev.filter(id => id !== deleteConfirmation.id));
+        } else {
+          setError(`Failed to delete entity: ${response.message}`);
+        }
+      }
+    } catch (err) {
+      setError('An error occurred during deletion. Please try again.');
+      console.error(err);
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmation(null);
+    }
+  };
+  
+  const cancelDelete = () => {
+    setDeleteConfirmation(null);
   };
   
   if (loading && !entities.length) {
@@ -251,6 +330,19 @@ const EntityList = () => {
               </div>
             </div>
             
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-blue-300">Entity List</h2>
+              
+              {filterTypeId && (
+                <button
+                  onClick={handleDeleteAllEntities}
+                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+                >
+                  Delete All
+                </button>
+              )}
+            </div>
+            
             {filteredEntities.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-400">No entities found.</p>
@@ -264,6 +356,7 @@ const EntityList = () => {
                     isSelected={selectedEntityIds.includes(entity.id)}
                     onSelect={handleSelectEntity}
                     onEdit={handleEditEntity}
+                    onDelete={handleDeleteEntity}
                   />
                 ))}
               </div>
@@ -301,6 +394,46 @@ const EntityList = () => {
                 className="px-4 py-2 border border-gray-600 rounded text-gray-300 hover:text-gray-200"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6 w-full max-w-md">
+            <h3 className="text-xl font-semibold text-red-400 mb-4">Confirm Deletion</h3>
+            
+            <p className="text-gray-300 mb-6">
+              {deleteConfirmation.isAll 
+                ? `Are you sure you want to delete ALL entities of type "${deleteConfirmation.typeName}"? This action cannot be undone.`
+                : `Are you sure you want to delete "${deleteConfirmation.name}"? This action cannot be undone.`}
+            </p>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 border border-gray-600 rounded text-gray-300 hover:border-gray-500 hover:text-gray-200"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded flex items-center"
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Deleting...
+                  </>
+                ) : 'Delete'}
               </button>
             </div>
           </div>

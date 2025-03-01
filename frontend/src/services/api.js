@@ -132,6 +132,46 @@ async function put(endpoint, body) {
   }
 }
 
+/**
+ * Make a DELETE request to the specified endpoint.
+ * 
+ * @param {string} endpoint - The API endpoint to request
+ * @returns {Promise} - The response data or error
+ */
+async function del(endpoint) {
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+      },
+      mode: 'cors',
+      credentials: 'omit',  // Don't send credentials
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    // Check if response is empty
+    const text = await response.text();
+    if (!text) {
+      return { status: 'error', message: 'Empty response received from server' };
+    }
+    
+    try {
+      const data = JSON.parse(text);
+      return data;
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return { status: 'error', message: 'Invalid JSON response from server' };
+    }
+  } catch (error) {
+    console.error(`Error deleting from ${endpoint}:`, error);
+    return { status: 'error', message: error.message || 'Unknown error occurred' };
+  }
+}
+
 // Entity Type Management
 const entityTypeApi = {
   /**
@@ -198,15 +238,29 @@ const entityApi = {
    * 
    * @param {string} entityTypeId - The entity type id
    * @param {number} count - Number of entities to generate (1-20)
-   * @param {string} variability - Variability level (low, medium, high)
+   * @param {string|number} variability - Variability level (low, medium, high) or number (0-1)
    * @returns {Promise} - The generated entities
    */
-  generate: (entityTypeId, count, variability) => post('/entities', {
-    entity_type_id: entityTypeId,
-    count: count,
-    variability: variability,
-    generate: true
-  }),
+  generate: (entityTypeId, count, variability) => {
+    // Convert numeric variability to string (if it's a number)
+    let variabilityLevel = variability;
+    if (typeof variability === 'number') {
+      if (variability < 0.33) {
+        variabilityLevel = 'low';
+      } else if (variability < 0.67) {
+        variabilityLevel = 'medium';
+      } else {
+        variabilityLevel = 'high';
+      }
+    }
+    
+    return post('/entities', {
+      entity_type_id: entityTypeId,
+      count: count,
+      variability: variabilityLevel,
+      generate: true
+    });
+  },
   
   /**
    * Update an existing entity.
@@ -215,7 +269,23 @@ const entityApi = {
    * @param {object} entity - The updated entity data
    * @returns {Promise} - The updated entity
    */
-  update: (id, entity) => put(`/entities/${id}`, entity)
+  update: (id, entity) => put(`/entities/${id}`, entity),
+  
+  /**
+   * Delete an entity by ID.
+   * 
+   * @param {string} id - The entity id to delete
+   * @returns {Promise} - Response indicating success or failure
+   */
+  delete: (id) => del(`/entities/${id}`),
+  
+  /**
+   * Delete all entities of a specific entity type.
+   * 
+   * @param {string} entityTypeId - The entity type id
+   * @returns {Promise} - Response with count of deleted entities
+   */
+  deleteByType: (entityTypeId) => del(`/entity-types/${entityTypeId}/entities`),
 }
 
 // Template Management
@@ -277,6 +347,7 @@ const api = {
   get,
   post,
   put,
+  delete: del,
   
   // Higher-level methods for convenience
   getEntityTypes: entityTypeApi.getAll,
@@ -289,6 +360,8 @@ const api = {
   createEntity: entityApi.create,
   updateEntity: entityApi.update,
   generateEntities: entityApi.generate,
+  deleteEntity: entityApi.delete,
+  deleteEntitiesByType: entityApi.deleteByType,
   
   getTemplates: templateApi.getAll,
   getTemplate: templateApi.getById,
