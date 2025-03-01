@@ -6,6 +6,9 @@ import './App.css';
 import EntityTypeList from './pages/EntityTypeList';
 import EntityTypeCreate from './pages/EntityTypeCreate';
 import TemplateDetail from './pages/TemplateDetail';
+import SimulationCreate from './pages/SimulationCreate';
+import SimulationList from './pages/SimulationList';
+import SimulationDetail from './pages/SimulationDetail';
 
 // Placeholder components for the initial structure
 const Home = () => (
@@ -51,15 +54,6 @@ const Entities = () => (
   </div>
 );
 
-const Simulations = () => (
-  <div className="container">
-    <h1>Simulations</h1>
-    <p>This page will allow you to run and view simulations between entities.</p>
-    <p>Coming soon in a future sprint...</p>
-    <Link to="/">Back to Home</Link>
-  </div>
-);
-
 // Navigation component
 const Navigation = () => (
   <nav className="navbar">
@@ -96,7 +90,10 @@ function App() {
             <Route path="/templates/:templateId" element={<TemplateDetail />} />
             {/* Placeholder routes */}
             <Route path="/entities" element={<Entities />} />
-            <Route path="/simulations" element={<Simulations />} />
+            {/* Simulation Routes */}
+            <Route path="/simulations" element={<SimulationList />} />
+            <Route path="/simulations/create" element={<SimulationCreate />} />
+            <Route path="/simulations/:id" element={<SimulationDetail />} />
           </Routes>
         </main>
         <footer className="footer">

@@ -29,14 +29,21 @@ def initialize():
 # Initialize LLM
 lm = None
 try:
-    # This is a placeholder for the actual LLM initialization
-    # In a real implementation, we would initialize the LLM here
-    # lm = dspy.LM('openai')
-    # dspy.configure(lm=lm)
-    pass
+    # Use the OpenAI API key from environment variables
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if api_key:
+        lm = dspy.OpenAI(api_key=api_key)
+        dspy.configure(lm=lm)
+    else:
+        print("Warning: No OPENAI_API_KEY found in environment variables.")
 except Exception as e:
     print(f"Warning: Failed to initialize LLM: {e}")
     print("The application will start, but simulation features will not work without a valid LLM configuration.")
+
+# Initialize simulation modules
+solo_simulator = None
+if lm:
+    solo_simulator = SoloInteractionSimulator()
 
 # Health check endpoint
 @app.route('/api/health', methods=['GET'])
@@ -138,8 +145,6 @@ def get_entities_by_type(entity_type_id):
 def create_simulation():
     """Run a new simulation."""
     try:
-        # This is a placeholder implementation
-        # In a real implementation, we would use the LLM to generate content
         data = request.json
         if not data:
             return jsonify({'error': 'No data provided'}), 400
@@ -158,10 +163,12 @@ def create_simulation():
         
         # Get entities
         entities = []
+        entity_names = []
         for entity_id in entity_ids:
             entity = storage.get_entity(entity_id)
             if entity:
                 entities.append(entity)
+                entity_names.append(entity.get('name', 'Unknown Entity'))
         
         # Check if we have the right number of entities for the interaction type
         if interaction_type == 'solo' and len(entities) != 1:
@@ -171,26 +178,41 @@ def create_simulation():
         if interaction_type == 'group' and len(entities) < 2:
             return jsonify({'error': 'Group interaction requires at least two entities'}), 400
         
-        # Generate placeholder content (in a real implementation, this would use the LLM)
-        if interaction_type == 'solo':
-            content = f"Solo simulation for {entities[0]['name']} in context: {context_description}"
-        elif interaction_type == 'dyadic':
-            content = f"Dyadic simulation between {entities[0]['name']} and {entities[1]['name']} in context: {context_description}"
+        # Generate content using DSPy if available
+        content = ""
+        if interaction_type == 'solo' and solo_simulator and lm:
+            # Use the LLM simulator for solo interactions
+            try:
+                entity = entities[0]
+                result = solo_simulator(entity=entity, context=context_description)
+                content = result
+            except Exception as e:
+                print(f"LLM simulation error: {e}")
+                # Fallback to placeholder content
+                content = f"Solo simulation for {entity_names[0]} in context: {context_description}"
         else:
-            entity_names = [entity['name'] for entity in entities]
-            content = f"Group simulation with {', '.join(entity_names)} in context: {context_description}"
+            # Fallback to placeholder content for other interaction types or if LLM is not available
+            if interaction_type == 'solo':
+                content = f"Solo simulation for {entity_names[0]} in context: {context_description}"
+            elif interaction_type == 'dyadic':
+                content = f"Dyadic simulation between {entity_names[0]} and {entity_names[1]} in context: {context_description}"
+            else:
+                content = f"Group simulation with {', '.join(entity_names)} in context: {context_description}"
         
-        # Save simulation
+        # Save simulation with additional metadata
         simulation_id = storage.save_simulation(
             context_id=context_id,
             interaction_type=interaction_type,
             entity_ids=entity_ids,
-            content=content
+            content=content,
+            metadata={"entity_names": entity_names}
         )
         
+        # Prepare response with entity names
         return jsonify({
             'id': simulation_id,
-            'content': content
+            'content': content,
+            'entity_names': entity_names
         }), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -202,6 +224,16 @@ def get_simulation(simulation_id):
         simulation = storage.get_simulation(simulation_id)
         if simulation is None:
             return jsonify({'error': 'Simulation not found'}), 404
+            
+        # Add context information
+        if simulation.get('context_id'):
+            context = storage.get_context(simulation['context_id'])
+            simulation['context'] = context
+            
+        # Extract entity names from metadata if available
+        if simulation.get('metadata') and 'entity_names' in simulation['metadata']:
+            simulation['entity_names'] = simulation['metadata']['entity_names']
+            
         return jsonify(simulation)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -211,6 +243,18 @@ def get_simulations():
     """Get all simulations."""
     try:
         simulations = storage.get_all_simulations()
+        
+        # Enhance response with context descriptions and entity names
+        for simulation in simulations:
+            # Add context information
+            if simulation.get('context_id'):
+                context = storage.get_context(simulation['context_id'])
+                simulation['context'] = context
+                
+            # Extract entity names from metadata if available
+            if simulation.get('metadata') and 'entity_names' in simulation['metadata']:
+                simulation['entity_names'] = simulation['metadata']['entity_names']
+                
         return jsonify(simulations)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

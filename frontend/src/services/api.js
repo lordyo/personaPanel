@@ -105,6 +105,33 @@ const entityTypeApi = {
   update: (id, entityType) => put(`/entity-types/${id}`, entityType),
 }
 
+// Entity Management
+const entityApi = {
+  /**
+   * Get a specific entity by id.
+   * 
+   * @param {string} id - The entity id
+   * @returns {Promise} - The entity data
+   */
+  getById: (id) => get(`/entities/${id}`),
+  
+  /**
+   * Get all entities for a specific entity type.
+   * 
+   * @param {string} entityTypeId - The entity type id
+   * @returns {Promise} - List of entities
+   */
+  getByType: (entityTypeId) => get(`/entity-types/${entityTypeId}/entities`),
+  
+  /**
+   * Create a new entity.
+   * 
+   * @param {object} entity - The entity data to create
+   * @returns {Promise} - The created entity
+   */
+  create: (entity) => post('/entities', entity),
+}
+
 // Template Management
 const templateApi = {
   /**
@@ -132,7 +159,41 @@ const templateApi = {
   createEntityType: (templateId, customization) => post(`/templates/${templateId}/create`, customization),
 }
 
-export {
-  entityTypeApi,
-  templateApi,
-}; 
+// Simulation Management
+const simulationApi = {
+  /**
+   * Get all simulations.
+   * 
+   * @returns {Promise} - List of simulations
+   */
+  getAll: () => get('/simulations'),
+  
+  /**
+   * Get a specific simulation by id.
+   * 
+   * @param {string} id - The simulation id
+   * @returns {Promise} - The simulation data
+   */
+  getById: (id) => get(`/simulations/${id}`),
+  
+  /**
+   * Create a new simulation.
+   * 
+   * @param {object} simulation - The simulation data including context and entity IDs
+   * @returns {Promise} - The created simulation
+   */
+  create: (simulation) => post('/simulations', simulation),
+}
+
+// Export a default API object with all the API functions
+const api = {
+  get,
+  post,
+  put,
+  entityType: entityTypeApi,
+  entity: entityApi,
+  template: templateApi,
+  simulation: simulationApi
+};
+
+export default api; 

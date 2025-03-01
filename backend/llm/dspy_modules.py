@@ -6,6 +6,13 @@ This module defines the DSPy modules used for entity generation and simulation.
 
 import dspy
 from typing import Dict, List, Any, Optional
+from .prompts import (
+    ENTITY_GENERATION_PROMPT, 
+    SOLO_INTERACTION_PROMPT, 
+    DYADIC_INTERACTION_PROMPT,
+    GROUP_INTERACTION_PROMPT,
+    format_entity_attributes
+)
 
 
 class EntityGenerator(dspy.Module):
@@ -33,10 +40,17 @@ class EntityGenerator(dspy.Module):
         Returns:
             Dictionary with name and attributes for the generated entity
         """
-        result = self.generate(
+        prompt = ENTITY_GENERATION_PROMPT.format(
             entity_type=entity_type,
             dimensions=dimensions,
             variability=variability
+        )
+        
+        result = self.generate(
+            entity_type=entity_type,
+            dimensions=dimensions,
+            variability=variability,
+            prompt=prompt
         )
         
         # In a real implementation, this would parse and validate the result
@@ -67,12 +81,23 @@ class SoloInteractionSimulator(dspy.Module):
         Returns:
             Generated response for the entity in the context
         """
-        result = self.simulate(
+        # Format the entity attributes for the prompt
+        entity_attributes = format_entity_attributes(entity)
+        
+        # Create the prompt using the template
+        prompt = SOLO_INTERACTION_PROMPT.format(
             entity=entity,
+            entity_attributes=entity_attributes,
             context=context
         )
         
-        # In a real implementation, this would parse and format the result
+        result = self.simulate(
+            entity=entity,
+            context=context,
+            prompt=prompt
+        )
+        
+        # Return the generated response
         return result.response
 
 
@@ -101,13 +126,27 @@ class DyadicInteractionSimulator(dspy.Module):
         Returns:
             Generated conversation between the two entities
         """
-        result = self.simulate(
+        # Format the entity attributes for the prompt
+        entity1_attributes = format_entity_attributes(entity1)
+        entity2_attributes = format_entity_attributes(entity2)
+        
+        # Create the prompt using the template
+        prompt = DYADIC_INTERACTION_PROMPT.format(
             entity1=entity1,
+            entity1_attributes=entity1_attributes,
             entity2=entity2,
+            entity2_attributes=entity2_attributes,
             context=context
         )
         
-        # In a real implementation, this would parse and format the result
+        result = self.simulate(
+            entity1=entity1,
+            entity2=entity2,
+            context=context,
+            prompt=prompt
+        )
+        
+        # Return the generated conversation
         return result.conversation
 
 
@@ -135,10 +174,26 @@ class GroupInteractionSimulator(dspy.Module):
         Returns:
             Generated group discussion
         """
-        result = self.simulate(
-            entities=entities,
+        # Create a formatted string of all entities with their attributes
+        entity_details = []
+        for i, entity in enumerate(entities):
+            entity_detail = f"Entity {i+1}: {entity['name']}\n"
+            entity_detail += format_entity_attributes(entity)
+            entity_details.append(entity_detail)
+        
+        entity_details_str = "\n\n".join(entity_details)
+        
+        # Create the prompt using the template
+        prompt = GROUP_INTERACTION_PROMPT.format(
+            entity_details=entity_details_str,
             context=context
         )
         
-        # In a real implementation, this would parse and format the result
+        result = self.simulate(
+            entities=entities,
+            context=context,
+            prompt=prompt
+        )
+        
+        # Return the generated discussion
         return result.discussion 
