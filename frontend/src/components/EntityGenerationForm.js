@@ -22,6 +22,16 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
     }
   }, [entityTypes, entityTypeId]);
   
+  // Update description when entity type changes
+  useEffect(() => {
+    if (entityTypeId) {
+      const selectedType = entityTypes.find(type => type.id === entityTypeId);
+      if (selectedType && selectedType.description) {
+        setEntityDescription(selectedType.description);
+      }
+    }
+  }, [entityTypeId, entityTypes]);
+  
   const handleSubmit = (e) => {
     e.preventDefault();
     
@@ -88,7 +98,7 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
           className="w-full bg-gray-750 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500 min-h-[80px]"
         />
         <p className="text-xs text-gray-500 mt-1">
-          A brief description of the entity to guide generation. Leave empty for fully automated generation.
+          Prepopulated with the entity type description. You can modify it to further guide generation.
         </p>
       </div>
       

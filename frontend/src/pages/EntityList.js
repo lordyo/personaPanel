@@ -299,7 +299,7 @@ const EntityList = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-blue-300">Entities</h1>
+        <h1 className="text-2xl font-bold text-blue-300">Entity Management</h1>
         <Link 
           to="/simulations/create" 
           className={`px-4 py-2 rounded transition-colors ${
@@ -375,7 +375,7 @@ const EntityList = () => {
             </div>
             
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-blue-300">Entity List</h2>
+              {/* Removed duplicate "Entity List" heading */}
               
               {filterTypeId && (
                 <button
