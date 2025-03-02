@@ -316,6 +316,7 @@ def create_entity():
         attributes: Dictionary of attribute values (when not generating)
         generate: Boolean indicating whether to generate attributes using LLM (default: False)
         count: Number of entities to generate (when generate is True, default: 1)
+        variability: Float between 0-1 indicating generation variability (default: 0.5)
         
     Returns:
         JSON response with the created entity ID(s)
@@ -346,7 +347,6 @@ def create_entity():
     if generate:
         # Use EntityGenerator to create entities
         try:
-            generator = EntityGenerator()
             entity_ids = []
             
             # Validate variability
@@ -370,49 +370,64 @@ def create_entity():
             dimensions = entity_type['dimensions']
             
             # Get entity type description if provided
-            entity_description = data.get('entity_description', '')
+            entity_description = data.get('entity_description', entity_type.get('description', ''))
             
             # Process entities in parallel using ThreadPoolExecutor
             from concurrent.futures import ThreadPoolExecutor, as_completed
             
-            # Function to generate a single entity
+            # Create a list to store generation failures
+            failures = []
+            
+            # Function to generate a single entity with better error handling
             def generate_single_entity():
                 # Each call uses a fresh generator instance to avoid caching between entities
                 gen = EntityGenerator()
-                generated = gen.forward(
-                    entity_type['name'],
-                    dimensions,
-                    variability,
-                    entity_description
-                )
-                
-                logger.debug(f"Generated entity attributes: {generated['attributes']}")
-                logger.debug(f"Generated entity name: {generated['name']}")
-                
-                # Log to entity generation logger
-                entity_logger = logging.getLogger('entity')
-                entity_logger.info(f"Generated entity: {generated['name']} for type {entity_type['name']}")
-                entity_logger.debug(f"Entity attributes: {generated['attributes']}")
-                
-                name = generated['name']
-                description = generated.get('description', '')
-                attributes = generated.get('attributes', {})
-                
-                # Save entity to database
-                entity_id = storage.save_entity(entity_type_id, name, description, attributes)
-                logger.info(f"Created generated entity: {name} (ID: {entity_id})")
-                entity_logger.info(f"Saved entity to database: {name} (ID: {entity_id})")
-                
-                return {
-                    "id": entity_id,
-                    "name": name,
-                    "type": entity_type['name'],
-                    "description": description,
-                    "attributes": attributes
-                }
+                try:
+                    generated = gen.forward(
+                        entity_type['name'],
+                        dimensions,
+                        variability,
+                        entity_description
+                    )
+                    
+                    logger.debug(f"Generated entity attributes: {generated['attributes']}")
+                    logger.debug(f"Generated entity name: {generated['name']}")
+                    
+                    # Log to entity generation logger
+                    entity_logger = logging.getLogger('entity')
+                    entity_logger.info(f"Generated entity: {generated['name']} for type {entity_type['name']}")
+                    entity_logger.debug(f"Entity attributes: {generated['attributes']}")
+                    
+                    name = generated['name']
+                    description = generated.get('description', '')
+                    attributes = generated.get('attributes', {})
+                    
+                    # Save entity to database
+                    entity_id = storage.save_entity(entity_type_id, name, description, attributes)
+                    logger.info(f"Created generated entity: {name} (ID: {entity_id})")
+                    entity_logger.info(f"Saved entity to database: {name} (ID: {entity_id})")
+                    
+                    return {
+                        "id": entity_id,
+                        "name": name,
+                        "type": entity_type['name'],
+                        "description": description,
+                        "attributes": attributes,
+                        "success": True
+                    }
+                except Exception as e:
+                    logger.error(f"Error generating single entity: {str(e)}")
+                    # Return a failure object instead of raising an exception
+                    return {
+                        "error": str(e),
+                        "type": entity_type['name'],
+                        "success": False
+                    }
             
             # Use ThreadPoolExecutor for concurrent entity generation
             entity_results = []
+            successful_entities = 0
+            
             with ThreadPoolExecutor(max_workers=min(count, 10)) as executor:
                 # Submit all generation tasks
                 future_to_entity = {executor.submit(generate_single_entity): i for i in range(count)}
@@ -421,17 +436,52 @@ def create_entity():
                 for future in as_completed(future_to_entity):
                     try:
                         entity_result = future.result()
-                        entity_ids.append(entity_result["id"])
-                        entity_results.append(entity_result)
+                        
+                        # Check if generation was successful
+                        if entity_result.get("success", False):
+                            entity_ids.append(entity_result["id"])
+                            entity_results.append(entity_result)
+                            successful_entities += 1
+                        else:
+                            # Record the failure
+                            failures.append({
+                                "index": future_to_entity[future],
+                                "error": entity_result.get("error", "Unknown error")
+                            })
                     except Exception as exc:
                         logger.error(f"Entity generation task failed: {exc}")
-                        raise LLMError(f"Entity generation failed: {str(exc)}")
+                        failures.append({
+                            "index": future_to_entity[future],
+                            "error": str(exc)
+                        })
             
-            # Return both IDs and the complete entity data
-            return success_response({
+            # Log summary of generation
+            logger.info(f"Entity generation completed: {successful_entities} successful, {len(failures)} failed")
+            
+            # Return both IDs and the complete entity data, including failure information
+            response_data = {
                 "ids": entity_ids,
-                "entities": entity_results
-            }, 201)
+                "entities": entity_results,
+                "total_requested": count,
+                "successful": successful_entities
+            }
+            
+            # Include failures if any occurred
+            if failures:
+                response_data["failures"] = failures
+                
+                # If all generations failed, return a 500 error
+                if successful_entities == 0:
+                    return error_response(
+                        f"All {count} entity generations failed. First error: {failures[0]['error']}", 
+                        500
+                    )
+                    
+                # If some generations failed but others succeeded, return a partial success
+                return success_response(response_data, 207)  # 207 Multi-Status
+            
+            # All successful
+            return success_response(response_data, 201)
             
         except Exception as e:
             logger.error(f"Error in batch entity generation: {str(e)}")
