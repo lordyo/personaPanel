@@ -16,6 +16,8 @@ const EntityTypeList = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [templatesError, setTemplatesError] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // {id, name, type} where type is 'entityType' or 'template'
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -78,6 +80,63 @@ const EntityTypeList = () => {
     navigate(`/entity-types/${entityTypeId}`);
   };
 
+  const handleDeleteEntityType = (entityTypeId) => {
+    const entityTypeToDelete = entityTypes.find(et => et.id === entityTypeId);
+    if (entityTypeToDelete) {
+      setDeleteConfirmation({
+        id: entityTypeId,
+        name: entityTypeToDelete.name || 'Unnamed Entity Type',
+        type: 'entityType'
+      });
+    }
+  };
+
+  const handleDeleteTemplate = (templateId) => {
+    const templateToDelete = templates.find(t => t.id === templateId);
+    if (templateToDelete) {
+      setDeleteConfirmation({
+        id: templateId,
+        name: templateToDelete.name || 'Unnamed Template',
+        type: 'template'
+      });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmation) return;
+    
+    try {
+      setDeleting(true);
+      
+      if (deleteConfirmation.type === 'entityType') {
+        // Delete the entity type
+        await entityTypeApi.delete(deleteConfirmation.id);
+        
+        // Remove the entity type from state
+        setEntityTypes(prev => prev.filter(et => et.id !== deleteConfirmation.id));
+      } else if (deleteConfirmation.type === 'template') {
+        // Delete the template
+        await templateApi.delete(deleteConfirmation.id);
+        
+        // Remove the template from state
+        setTemplates(prev => prev.filter(t => t.id !== deleteConfirmation.id));
+      }
+      
+      // Clear error if any
+      setError(null);
+    } catch (err) {
+      console.error("Error deleting:", err);
+      setError(`Failed to delete ${deleteConfirmation.type}. ${err.message || ""}`);
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmation(null);
+    }
+  };
+  
+  const cancelDelete = () => {
+    setDeleteConfirmation(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-6xl mx-auto">
@@ -120,6 +179,45 @@ const EntityTypeList = () => {
           </nav>
         </div>
         
+        {/* Delete Confirmation Modal */}
+        {deleteConfirmation && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-xl max-w-md w-full">
+              <h3 className="text-xl font-bold text-red-400 mb-4">Delete Confirmation</h3>
+              <p className="text-gray-300 mb-6">
+                Are you sure you want to delete the {deleteConfirmation.type === 'entityType' ? 'entity type' : 'template'} "{deleteConfirmation.name}"? 
+                This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  className="px-4 py-2 text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+                  onClick={cancelDelete}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex items-center gap-2"
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Content area */}
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
@@ -147,7 +245,8 @@ const EntityTypeList = () => {
                   <EntityTypeCard 
                     key={entityType.id} 
                     entityType={entityType} 
-                    onView={handleEntityTypeSelect} 
+                    onView={handleEntityTypeSelect}
+                    onDelete={handleDeleteEntityType}
                   />
                 ))}
               </div>
@@ -178,7 +277,8 @@ const EntityTypeList = () => {
                     <TemplateCard 
                       key={template.id} 
                       template={template} 
-                      onSelect={handleTemplateSelect} 
+                      onSelect={handleTemplateSelect}
+                      onDelete={handleDeleteTemplate}
                     />
                   ))}
                 </div>

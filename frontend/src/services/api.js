@@ -205,6 +205,14 @@ const entityTypeApi = {
    * @returns {Promise} - The updated entity type
    */
   update: (id, entityType) => put(`/entity-types/${id}`, entityType),
+  
+  /**
+   * Delete an entity type by ID.
+   * 
+   * @param {string} id - The entity type id to delete
+   * @returns {Promise} - Response indicating success or failure
+   */
+  delete: (id) => del(`/entity-types/${id}`),
 }
 
 // Entity Management
@@ -313,6 +321,14 @@ const templateApi = {
    * @returns {Promise} - The created entity type
    */
   createEntityType: (templateId, customization) => post(`/templates/${templateId}/create`, customization),
+  
+  /**
+   * Delete a template by ID.
+   * 
+   * @param {string} id - The template id to delete
+   * @returns {Promise} - Response indicating success or failure
+   */
+  delete: (id) => del(`/templates/${id}`),
 }
 
 // Simulation Management
