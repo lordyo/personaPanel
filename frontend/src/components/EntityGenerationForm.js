@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 /**
- * Form component for generating entities.
+ * Form for generating new entities based on entity types.
  * 
  * @param {Object} props - Component props
- * @param {Array} props.entityTypes - Available entity types 
- * @param {Function} props.onSubmit - Function to call to generate entities
+ * @param {Array} props.entityTypes - Available entity types
+ * @param {Function} props.onSubmit - Function to call when form is submitted
  * @param {boolean} props.disabled - Whether the form is disabled
  * @returns {JSX.Element} - Rendered component
  */
@@ -14,7 +14,7 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
   const [entityDescription, setEntityDescription] = useState('');
   const [count, setCount] = useState(1);
   const [variability, setVariability] = useState(0.5);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   
   // Load saved settings from localStorage when component mounts
   useEffect(() => {
@@ -30,15 +30,26 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
       // Only set if it's a valid entity type id
       if (entityTypes.some(type => type.id === savedEntityTypeId)) {
         setEntityTypeId(savedEntityTypeId);
+        
+        // Also set the description based on this type
+        const selectedType = entityTypes.find(type => type.id === savedEntityTypeId);
+        if (selectedType && selectedType.description) {
+          setEntityDescription(selectedType.description);
+        }
       }
     } else if (entityTypes.length > 0) {
       // Default to first entity type if no saved type
       setEntityTypeId(entityTypes[0].id);
+      
+      // Initialize the description with the entity type description
+      if (entityTypes[0].description) {
+        setEntityDescription(entityTypes[0].description);
+      }
     }
     
     if (savedCount) {
       const parsedCount = parseInt(savedCount);
-      if (!isNaN(parsedCount) && parsedCount >= 1 && parsedCount <= 20) {
+      if (!isNaN(parsedCount) && parsedCount >= 1 && parsedCount <= 50) {
         setCount(parsedCount);
       }
     }
@@ -52,17 +63,21 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
   }, [entityTypes]);
   
   // Update description when entity type changes
-  useEffect(() => {
-    if (entityTypeId) {
-      const selectedType = entityTypes.find(type => type.id === entityTypeId);
-      if (selectedType && selectedType.description) {
-        setEntityDescription(selectedType.description);
-      }
-      
-      // Save entityTypeId to localStorage
-      localStorage.setItem('entityGenerationSettings.entityTypeId', entityTypeId);
+  const handleEntityTypeChange = (e) => {
+    const newTypeId = e.target.value;
+    setEntityTypeId(newTypeId);
+    
+    // Update description with the entity type description
+    const selectedType = entityTypes.find(type => type.id === newTypeId);
+    if (selectedType && selectedType.description) {
+      setEntityDescription(selectedType.description);
+    } else {
+      setEntityDescription('');
     }
-  }, [entityTypeId, entityTypes]);
+    
+    // Save entityTypeId to localStorage
+    localStorage.setItem('entityGenerationSettings.entityTypeId', newTypeId);
+  };
   
   // Save count to localStorage when it changes
   useEffect(() => {
@@ -76,23 +91,23 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
   
   const handleSubmit = (e) => {
     e.preventDefault();
+    setError(null);
     
     if (!entityTypeId) {
-      setError('Please select an entity type.');
+      setError("Please select an entity type");
       return;
     }
     
-    if (count < 1 || count > 20) {
-      setError('Count must be between 1 and 20.');
+    if (count < 1 || count > 50) {
+      setError("Count must be between 1 and 50");
       return;
     }
     
     if (variability < 0 || variability > 1) {
-      setError('Variability must be between 0 and 1.');
+      setError("Variability must be between 0 and 1");
       return;
     }
     
-    setError('');
     onSubmit({
       entityTypeId,
       entityDescription,
@@ -102,21 +117,29 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
   };
   
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Generation in progress indicator */}
+      {disabled && (
+        <div className="bg-blue-900 bg-opacity-30 p-4 rounded mb-4 flex items-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-b-0 border-blue-500 mr-3"></div>
+          <div className="text-blue-300">Generating entities... This may take several seconds per entity.</div>
+        </div>
+      )}
+    
       {error && (
-        <div className="mb-4 p-3 bg-red-400 bg-opacity-10 border border-red-400 rounded-lg text-red-400 text-sm">
-          {error}
+        <div className="bg-red-900 p-4 rounded mb-4">
+          <p className="text-red-300">{error}</p>
         </div>
       )}
       
       <div className="mb-4">
         <label className="block text-gray-400 text-sm font-medium mb-2" htmlFor="entityType">
-          Entity Type
+          Entity Type (Required)
         </label>
         <select
           id="entityType"
           value={entityTypeId}
-          onChange={(e) => setEntityTypeId(e.target.value)}
+          onChange={handleEntityTypeChange}
           className="w-full bg-gray-750 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
           disabled={disabled}
         >
@@ -148,35 +171,33 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
       
       <div className="mb-4">
         <label className="block text-gray-400 text-sm font-medium mb-2" htmlFor="count">
-          Count ({count})
+          Number of Entities to Generate
         </label>
         <input
           id="count"
-          type="range"
+          type="number"
           min="1"
-          max="20"
+          max="50"
           value={count}
           onChange={(e) => setCount(parseInt(e.target.value))}
-          className="w-full"
+          className="w-full bg-gray-750 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
           disabled={disabled}
         />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>1</span>
-          <span>10</span>
-          <span>20</span>
-        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Generate up to 50 entities at once. Higher numbers will take longer.
+        </p>
       </div>
       
-      <div className="mb-6">
+      <div className="mb-4">
         <label className="block text-gray-400 text-sm font-medium mb-2" htmlFor="variability">
-          Variability ({variability < 0.33 ? 'Low' : variability < 0.67 ? 'Medium' : 'High'})
+          Variability: {variability}
         </label>
         <input
           id="variability"
           type="range"
           min="0"
           max="1"
-          step="0.05"
+          step="0.1"
           value={variability}
           onChange={(e) => setVariability(parseFloat(e.target.value))}
           className="w-full"
@@ -194,7 +215,12 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
         className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
         disabled={disabled}
       >
-        {disabled ? 'Generating...' : 'Generate Entities'}
+        {disabled ? (
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-b-0 border-white mr-2"></div>
+            <span>Generating...</span>
+          </div>
+        ) : 'Generate Entities'}
       </button>
     </form>
   );

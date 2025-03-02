@@ -30,46 +30,48 @@ const EntityList = () => {
   
   // Fetch entity types and entities on component mount
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const typesResponse = await api.getEntityTypes();
-        // Handle both response formats
-        const types = typesResponse.data || typesResponse;
-        setEntityTypes(Array.isArray(types) ? types : []);
-        
-        // Fetch all entities 
-        const entitiesPromises = (typesResponse.data || typesResponse).map(type => 
-          api.getEntitiesByType(type.id)
-        );
-        
-        const entitiesResponses = await Promise.all(entitiesPromises);
-        const allEntities = entitiesResponses.flatMap((response, index) => {
-          // Get the entity type for this response
-          const entityType = types[index];
-          // Get the entities from the response
-          const entities = response.data || response || [];
-          
-          // Add entity_type_name to each entity
-          return entities.map(entity => ({
-            ...entity,
-            entity_type_id: entityType.id,
-            entity_type_name: entityType.name || 'Unknown Type'
-          }));
-        });
-        
-        setEntities(allEntities);
-        setFilteredEntities(allEntities);
-      } catch (err) {
-        setError('Failed to load data. Please try again.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchData();
   }, []);
+  
+  // Define fetchData function in the component scope so it can be reused
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const typesResponse = await api.getEntityTypes();
+      // Handle both response formats
+      const types = typesResponse.data || typesResponse;
+      setEntityTypes(Array.isArray(types) ? types : []);
+      
+      // Fetch all entities 
+      const entitiesPromises = (typesResponse.data || typesResponse).map(type => 
+        api.getEntitiesByType(type.id)
+      );
+      
+      const entitiesResponses = await Promise.all(entitiesPromises);
+      const allEntities = entitiesResponses.flatMap((response, index) => {
+        // Get the entity type for this response
+        const entityType = types[index];
+        // Get the entities from the response
+        const entities = response.data || response || [];
+        
+        // Add entity_type_name to each entity for display
+        return entities.map(entity => ({
+          ...entity,
+          entity_type_id: entityType.id,
+          entity_type_name: entityType.name
+        }));
+      });
+      
+      setEntities(allEntities);
+      setFilteredEntities(allEntities);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to load entity types and entities. " + (err.message || ""));
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Filter entities when search term or filter type changes
   useEffect(() => {
@@ -165,7 +167,8 @@ const EntityList = () => {
   
   const handleGenerateEntities = async (formData) => {
     try {
-      setGeneratingEntities(true);
+      setGeneratingEntities(false); // Hide the form
+      setLoading(true); // Show loading indicator
       setError(null);
       
       // Find the entity type first to ensure we have the name
@@ -174,12 +177,16 @@ const EntityList = () => {
         throw new Error("Entity type not found");
       }
       
+      console.log("Generating entities with form data:", formData);
+      
       const response = await api.generateEntities(
         formData.entityTypeId,
         formData.count,
         formData.variability,
         formData.entityDescription
       );
+      
+      console.log("Generation response:", response);
       
       if (response.status === 'success') {
         // Check if the response has entities directly in it
@@ -194,45 +201,33 @@ const EntityList = () => {
             entity_type_name: entityType.name || 'Unknown Type'
           }));
           
+          console.log("Processed entities:", processedEntities);
+          
           // Update the entities state
           setEntities(prev => {
             // Filter out any entities of this type that might have the same ID
             // This ensures we don't have duplicates
-            const filteredEntities = prev.filter(e => 
-              !processedEntities.some(newEntity => newEntity.id === e.id)
+            const existingEntitiesFiltered = prev.filter(entity => 
+              !processedEntities.some(newEntity => newEntity.id === entity.id)
             );
-            return [...filteredEntities, ...processedEntities];
+            return [...existingEntitiesFiltered, ...processedEntities];
           });
         } else {
-          // Fallback to the old way - fetch entities again
-          const newEntitiesResponse = await api.getEntitiesByType(formData.entityTypeId);
-          
-          // Get the entities from the response
-          const newEntitiesData = newEntitiesResponse.data || newEntitiesResponse || [];
-          
-          // Add entity_type_name to each entity
-          const processedEntities = newEntitiesData.map(entity => ({
-            ...entity,
-            entity_type_id: formData.entityTypeId,
-            entity_type_name: entityType.name || 'Unknown Type'
-          }));
-          
-          // Add or replace entities of this type in our state
-          setEntities(prev => {
-            // Filter out entities of the same type
-            const otherEntities = prev.filter(e => e.entity_type_id !== formData.entityTypeId);
-            // Add the new entities with proper type name
-            return [...otherEntities, ...processedEntities];
-          });
+          // Fallback - refetch all entities if we don't get them directly
+          await fetchData();
         }
+        
+        // Clear any previous error
+        setError(null);
       } else {
-        setError('Failed to generate entities: ' + (response.message || 'Unknown error'));
+        console.error("Error response from generate entities:", response);
+        setError(response.message || 'Failed to generate entities');
       }
     } catch (err) {
-      setError('Failed to generate entities. Please try again.');
-      console.error(err);
+      console.error("Error generating entities:", err);
+      setError("Failed to generate entities: " + (err.message || ""));
     } finally {
-      setGeneratingEntities(false);
+      setLoading(false);
     }
   };
   
@@ -242,91 +237,63 @@ const EntityList = () => {
   };
   
   const handleDeleteEntity = (entityId) => {
-    setLoading(true);
-    
-    api.deleteEntity(entityId)
-      .then(() => {
-        // Remove from selection if selected
-        setSelectedEntities(prev => 
-          prev.filter(id => id !== entityId)
-        );
-        
-        // Close detail modal if viewing this entity
-        if (viewingEntity && viewingEntity.id === entityId) {
-          setViewingEntity(null);
-        }
-        
-        // Close edit form if editing this entity
-        if (editingEntity && editingEntity.id === entityId) {
-          setEditingEntity(null);
-        }
-        
-        // Remove from entities list
-        setEntities(prev => 
-          prev.filter(entity => entity.id !== entityId)
-        );
-        
-        setError(null);
-      })
-      .catch(err => {
-        console.error("Error deleting entity:", err);
-        setError("Failed to delete entity. " + (err.message || ""));
-      })
-      .finally(() => {
-        setLoading(false);
+    // Find the entity to get its name
+    const entityToDelete = entities.find(e => e.id === entityId);
+    if (entityToDelete) {
+      setDeleteConfirmation({
+        id: entityId,
+        name: entityToDelete.name || 'Unnamed Entity'
       });
-  };
-  
-  const handleDeleteAllEntities = async () => {
-    if (!filterTypeId) return;
-    
-    // Find the entity type name
-    const entityType = entityTypes.find(type => type.id === filterTypeId);
-    if (!entityType) return;
-    
-    // Set up confirmation dialog for deleting all entities of this type
-    setDeleteConfirmation({
-      typeId: filterTypeId,
-      typeName: entityType.name,
-      isAll: true
-    });
+    }
   };
   
   const confirmDelete = async () => {
+    if (!deleteConfirmation) return;
+    
     try {
       setDeleting(true);
       
-      if (deleteConfirmation.isAll) {
-        // Delete all entities of a type
-        const response = await api.deleteEntitiesByType(deleteConfirmation.typeId);
+      if (deleteConfirmation.id) {
+        // Single entity deletion
+        await api.deleteEntity(deleteConfirmation.id);
         
-        if (response.status === 'success') {
-          // Update the entities list by removing all entities of this type
-          setEntities(prev => prev.filter(e => e.entity_type_id !== deleteConfirmation.typeId));
-          setFilteredEntities(prev => prev.filter(e => e.entity_type_id !== deleteConfirmation.typeId));
-          setSelectedEntities(prev => prev.filter(id => {
-            const entity = entities.find(e => e.id === id);
-            return entity && entity.entity_type_id !== deleteConfirmation.typeId;
-          }));
-        } else {
-          setError(`Failed to delete entities: ${response.message}`);
-        }
-      } else {
-        // Delete a single entity
-        const response = await api.deleteEntity(deleteConfirmation.id);
+        // Remove the entity from state
+        setEntities(prev => prev.filter(e => e.id !== deleteConfirmation.id));
         
-        if (response.status === 'success') {
-          // Update the entities list
-          setEntities(prev => prev.filter(e => e.id !== deleteConfirmation.id));
-          setFilteredEntities(prev => prev.filter(e => e.id !== deleteConfirmation.id));
+        // Also remove from selected entities if it's there
+        if (selectedEntities.includes(deleteConfirmation.id)) {
           setSelectedEntities(prev => prev.filter(id => id !== deleteConfirmation.id));
-        } else {
-          setError(`Failed to delete entity: ${response.message}`);
+        }
+        
+        // Close the entity detail view if this entity was being viewed
+        if (viewingEntity && viewingEntity.id === deleteConfirmation.id) {
+          setViewingEntity(null);
+        }
+      } else if (deleteConfirmation.typeId) {
+        // Delete all entities of a type
+        await api.deleteEntitiesByType(deleteConfirmation.typeId);
+        
+        // Remove entities of this type from state
+        setEntities(prev => prev.filter(e => e.entity_type_id !== deleteConfirmation.typeId));
+        
+        // Also remove from selected entities
+        setSelectedEntities(prev => 
+          prev.filter(id => 
+            !entities.find(e => e.id === id && e.entity_type_id === deleteConfirmation.typeId)
+          )
+        );
+        
+        // Close the entity detail view if an entity of this type was being viewed
+        if (viewingEntity && viewingEntity.entity_type_id === deleteConfirmation.typeId) {
+          setViewingEntity(null);
         }
       }
+      
+      // Clear error if any
+      setError(null);
     } catch (err) {
-      setError('An error occurred during deletion. Please try again.');
-      console.error(err);
+      console.error("Error deleting entity:", err);
+      setError("Failed to delete entity. " + (err.message || ""));
     } finally {
       setDeleting(false);
       setDeleteConfirmation(null);
@@ -450,13 +417,24 @@ const EntityList = () => {
         </div>
       )}
       
+      {/* Loading indicator for entity generation */}
+      {loading && entities.length > 0 && (
+        <div className="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <LoadingIndicator 
+            message="Generating entities, please wait..." 
+            inline={true} 
+            size="small"
+          />
+        </div>
+      )}
+      
       {/* Entity list */}
       <div>
         <h2 className="text-2xl font-bold text-white mb-4">Entities</h2>
         
-        {loading && (
+        {loading && !entities.length && (
           <div className="flex justify-center items-center p-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <LoadingIndicator message="Loading entities..." size="large" />
           </div>
         )}
         
@@ -496,6 +474,44 @@ const EntityList = () => {
           onClose={() => setViewingEntity(null)}
           onSave={handleUpdateEntity}
         />
+      )}
+      
+      {/* Delete confirmation modal */}
+      {deleteConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg max-w-md w-full border border-gray-700">
+            <h3 className="text-xl font-bold text-white mb-4">Confirm Deletion</h3>
+            <p className="text-gray-300 mb-6">
+              {deleteConfirmation.id 
+                ? `Are you sure you want to delete "${deleteConfirmation.name}"?` 
+                : `Are you sure you want to delete all entities of type "${deleteConfirmation.typeName}"?`}
+              <br/>
+              <span className="text-red-400 text-sm">This action cannot be undone.</span>
+            </p>
+            
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 focus:outline-none"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none flex items-center justify-center disabled:bg-gray-600"
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-b-0 border-white mr-2"></div>
+                    <span>Deleting...</span>
+                  </>
+                ) : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
