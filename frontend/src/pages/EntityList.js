@@ -16,7 +16,7 @@ const EntityList = () => {
   const [entityTypes, setEntityTypes] = useState([]);
   const [entities, setEntities] = useState([]);
   const [filteredEntities, setFilteredEntities] = useState([]);
-  const [selectedEntityIds, setSelectedEntityIds] = useState([]);
+  const [selectedEntities, setSelectedEntities] = useState([]);
   const [viewingEntity, setViewingEntity] = useState(null);
   const [editingEntity, setEditingEntity] = useState(null);
   const [editingEntityType, setEditingEntityType] = useState(null);
@@ -44,9 +44,19 @@ const EntityList = () => {
         );
         
         const entitiesResponses = await Promise.all(entitiesPromises);
-        const allEntities = entitiesResponses.flatMap(response => 
-          response.data || response || []
-        );
+        const allEntities = entitiesResponses.flatMap((response, index) => {
+          // Get the entity type for this response
+          const entityType = types[index];
+          // Get the entities from the response
+          const entities = response.data || response || [];
+          
+          // Add entity_type_name to each entity
+          return entities.map(entity => ({
+            ...entity,
+            entity_type_id: entityType.id,
+            entity_type_name: entityType.name || 'Unknown Type'
+          }));
+        });
         
         setEntities(allEntities);
         setFilteredEntities(allEntities);
@@ -82,19 +92,19 @@ const EntityList = () => {
   }, [entities, searchTerm, filterTypeId]);
   
   const handleSelectEntity = (entityId) => {
-    // Find the entity in our list
-    const entity = entities.find(e => e.id === entityId);
-    if (entity) {
-      setViewingEntity(entity);
-    }
-    
-    setSelectedEntityIds(prev => {
+    setSelectedEntities(prev => {
+      // If the entity is already selected, remove it from the selection
       if (prev.includes(entityId)) {
         return prev.filter(id => id !== entityId);
-      } else {
-        return [...prev, entityId];
       }
+      
+      // Otherwise, add it to the selection
+      return [...prev, entityId];
     });
+  };
+  
+  const handleViewEntity = (entity) => {
+    setViewingEntity(entity);
   };
   
   const handleEditEntity = async (entityId) => {
@@ -125,25 +135,29 @@ const EntityList = () => {
   };
   
   const handleUpdateEntity = async (updatedEntity) => {
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      const response = await api.updateEntity(updatedEntity.id, updatedEntity);
+      const result = await api.updateEntity(updatedEntity.id, updatedEntity);
       
-      if (response.status === 'success') {
-        // Update the entity in the local state
-        setEntities(prev => prev.map(entity => 
-          entity.id === updatedEntity.id ? updatedEntity : entity
-        ));
-        
-        // Clear editing state
-        setEditingEntity(null);
-        setEditingEntityType(null);
-      } else {
-        setError('Failed to update entity.');
+      // Update the entity in our local state
+      setEntities(prev => 
+        prev.map(entity => 
+          entity.id === updatedEntity.id ? result : entity
+        )
+      );
+      
+      // Update viewing entity if this entity is being viewed
+      if (viewingEntity && viewingEntity.id === updatedEntity.id) {
+        setViewingEntity(result);
       }
+      
+      setError(null);
+      return Promise.resolve(result);
     } catch (err) {
-      setError('Failed to update entity.');
-      console.error(err);
+      console.error("Error updating entity:", err);
+      setError("Failed to update entity. " + (err.message || ""));
+      return Promise.reject(err);
     } finally {
       setLoading(false);
     }
@@ -153,6 +167,12 @@ const EntityList = () => {
     try {
       setGeneratingEntities(true);
       setError(null);
+      
+      // Find the entity type first to ensure we have the name
+      const entityType = entityTypes.find(et => et.id === formData.entityTypeId);
+      if (!entityType) {
+        throw new Error("Entity type not found");
+      }
       
       const response = await api.generateEntities(
         formData.entityTypeId,
@@ -168,11 +188,10 @@ const EntityList = () => {
           const newEntities = response.data.entities;
           
           // Add entity_type_name to each entity for display purposes
-          const entityType = entityTypes.find(et => et.id === formData.entityTypeId);
           const processedEntities = newEntities.map(entity => ({
             ...entity,
             entity_type_id: formData.entityTypeId,
-            entity_type_name: entityType?.name || 'Unknown Type'
+            entity_type_name: entityType.name || 'Unknown Type'
           }));
           
           // Update the entities state
@@ -186,16 +205,24 @@ const EntityList = () => {
           });
         } else {
           // Fallback to the old way - fetch entities again
-          const entityType = entityTypes.find(et => et.id === formData.entityTypeId);
           const newEntitiesResponse = await api.getEntitiesByType(formData.entityTypeId);
+          
+          // Get the entities from the response
+          const newEntitiesData = newEntitiesResponse.data || newEntitiesResponse || [];
+          
+          // Add entity_type_name to each entity
+          const processedEntities = newEntitiesData.map(entity => ({
+            ...entity,
+            entity_type_id: formData.entityTypeId,
+            entity_type_name: entityType.name || 'Unknown Type'
+          }));
           
           // Add or replace entities of this type in our state
           setEntities(prev => {
             // Filter out entities of the same type
             const otherEntities = prev.filter(e => e.entity_type_id !== formData.entityTypeId);
-            // Add the new entities - check if response has data property or is the data itself
-            const newEntities = newEntitiesResponse.data || newEntitiesResponse;
-            return [...otherEntities, ...(Array.isArray(newEntities) ? newEntities : [])];
+            // Add the new entities with proper type name
+            return [...otherEntities, ...processedEntities];
           });
         }
       } else {
@@ -214,22 +241,40 @@ const EntityList = () => {
     setFilterTypeId('');
   };
   
-  const handleDeleteEntity = async (entityId) => {
-    if (!entityId) {
-      console.error("Attempted to delete entity with undefined ID");
-      return;
-    }
+  const handleDeleteEntity = (entityId) => {
+    setLoading(true);
     
-    // Find the entity to show its name in the confirmation
-    const entityToDelete = entities.find(e => e.id === entityId);
-    if (!entityToDelete) return;
-    
-    // Set up confirmation dialog
-    setDeleteConfirmation({
-      id: entityId,
-      name: entityToDelete.name || 'Unnamed Entity',
-      isAll: false
-    });
+    api.deleteEntity(entityId)
+      .then(() => {
+        // Remove from selection if selected
+        setSelectedEntities(prev => 
+          prev.filter(id => id !== entityId)
+        );
+        
+        // Close detail modal if viewing this entity
+        if (viewingEntity && viewingEntity.id === entityId) {
+          setViewingEntity(null);
+        }
+        
+        // Close edit form if editing this entity
+        if (editingEntity && editingEntity.id === entityId) {
+          setEditingEntity(null);
+        }
+        
+        // Remove from entities list
+        setEntities(prev => 
+          prev.filter(entity => entity.id !== entityId)
+        );
+        
+        setError(null);
+      })
+      .catch(err => {
+        console.error("Error deleting entity:", err);
+        setError("Failed to delete entity. " + (err.message || ""));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
   
   const handleDeleteAllEntities = async () => {
@@ -259,7 +304,7 @@ const EntityList = () => {
           // Update the entities list by removing all entities of this type
           setEntities(prev => prev.filter(e => e.entity_type_id !== deleteConfirmation.typeId));
           setFilteredEntities(prev => prev.filter(e => e.entity_type_id !== deleteConfirmation.typeId));
-          setSelectedEntityIds(prev => prev.filter(id => {
+          setSelectedEntities(prev => prev.filter(id => {
             const entity = entities.find(e => e.id === id);
             return entity && entity.entity_type_id !== deleteConfirmation.typeId;
           }));
@@ -274,7 +319,7 @@ const EntityList = () => {
           // Update the entities list
           setEntities(prev => prev.filter(e => e.id !== deleteConfirmation.id));
           setFilteredEntities(prev => prev.filter(e => e.id !== deleteConfirmation.id));
-          setSelectedEntityIds(prev => prev.filter(id => id !== deleteConfirmation.id));
+          setSelectedEntities(prev => prev.filter(id => id !== deleteConfirmation.id));
         } else {
           setError(`Failed to delete entity: ${response.message}`);
         }
@@ -292,205 +337,164 @@ const EntityList = () => {
     setDeleteConfirmation(null);
   };
   
+  // Handle batch delete for selected entities
+  const handleDeleteSelected = () => {
+    if (selectedEntities.length === 0) return;
+    
+    if (window.confirm(`Are you sure you want to delete ${selectedEntities.length} selected entities?`)) {
+      // Delete each selected entity
+      Promise.all(selectedEntities.map(id => api.deleteEntity(id)))
+        .then(() => {
+          // Update UI state after successful deletion
+          setEntities(prev => prev.filter(entity => !selectedEntities.includes(entity.id)));
+          setSelectedEntities([]);
+          setError(null);
+        })
+        .catch(err => {
+          console.error("Error deleting selected entities:", err);
+          setError("Failed to delete some entities. Please try again.");
+        });
+    }
+  };
+  
   if (loading && !entities.length) {
     return <LoadingIndicator message="Loading entities..." />;
   }
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-blue-300">Entity Management</h1>
-        <Link 
-          to="/simulations/create" 
-          className={`px-4 py-2 rounded transition-colors ${
-            !selectedEntityIds.length 
-              ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
-              : 'bg-green-400 hover:bg-green-500 text-white'
-          }`}
-          onClick={e => !selectedEntityIds.length && e.preventDefault()}
-        >
-          Simulate with {selectedEntityIds.length} Selected
-        </Link>
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <h1 className="text-3xl font-bold text-white mb-8">Entity Management</h1>
+      
+      {/* Controls and filters */}
+      <div className="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
+        <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4 mb-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search entities..."
+              className="w-full px-4 py-2 bg-gray-750 border border-gray-700 rounded text-gray-300 focus:outline-none focus:border-blue-500"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <div className="md:w-1/3">
+            <select
+              className="w-full px-4 py-2 bg-gray-750 border border-gray-700 rounded text-gray-300 focus:outline-none focus:border-blue-500"
+              value={filterTypeId || ""}
+              onChange={e => setFilterTypeId(e.target.value === "" ? null : e.target.value)}
+            >
+              <option value="">All Entity Types</option>
+              {entityTypes.map(type => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between">
+          <div>
+            <button
+              onClick={() => setGeneratingEntities(!generatingEntities)}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mb-3 md:mb-0 mr-3 focus:outline-none"
+            >
+              {generatingEntities ? 'Cancel' : 'Generate Entities'}
+            </button>
+            
+            {selectedEntities.length > 0 && (
+              <button
+                onClick={() => handleDeleteSelected()}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
+              >
+                Delete Selected ({selectedEntities.length})
+              </button>
+            )}
+          </div>
+          
+          {selectedEntities.length > 1 && (
+            <Link 
+              to={`/simulation-create?entityIds=${selectedEntities.join(',')}`}
+              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 focus:outline-none"
+            >
+              Simulate Selected Entities
+            </Link>
+          )}
+        </div>
       </div>
       
+      {/* Generation form */}
+      {generatingEntities && (
+        <div className="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <h2 className="text-xl font-semibold text-white mb-4">Generate New Entities</h2>
+          <EntityGenerationForm 
+            entityTypes={entityTypes}
+            onSubmit={handleGenerateEntities}
+            disabled={loading}
+          />
+          <button
+            onClick={() => setGeneratingEntities(false)}
+            className="mt-4 text-gray-400 hover:text-white block ml-auto"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      
+      {/* Error display */}
       {error && (
-        <div className="p-4 mb-6 bg-red-400 bg-opacity-10 border border-red-400 rounded-lg text-red-400">
+        <div className="mb-6 bg-red-900 text-white p-4 rounded-lg">
+          <h3 className="font-bold mb-2">Error</h3>
           <p>{error}</p>
         </div>
       )}
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column: Entity Generation */}
-        <div className="lg:col-span-1">
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-card">
-            <h2 className="text-xl font-semibold text-blue-300 mb-4">Generate Entities</h2>
-            {generatingEntities ? (
-              <LoadingIndicator message="Generating entities..." />
-            ) : (
-              <EntityGenerationForm 
-                entityTypes={entityTypes} 
-                onGenerate={handleGenerateEntities} 
-              />
-            )}
-          </div>
-        </div>
+      {/* Entity list */}
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-4">Entities</h2>
         
-        {/* Right column: Entity List */}
-        <div className="lg:col-span-2">
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-card">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-              <h2 className="text-xl font-semibold text-blue-300 mb-3 md:mb-0">Entity List</h2>
-              
-              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search entities..."
-                  className="px-3 py-2 bg-gray-750 border border-gray-700 rounded text-gray-300 focus:outline-none focus:border-blue-500"
-                />
-                
-                <select
-                  value={filterTypeId}
-                  onChange={(e) => setFilterTypeId(e.target.value)}
-                  className="px-3 py-2 bg-gray-750 border border-gray-700 rounded text-gray-300 focus:outline-none focus:border-blue-500"
-                >
-                  <option value="">All Types</option>
-                  {entityTypes.map(type => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
-                </select>
-                
-                {(searchTerm || filterTypeId) && (
-                  <button
-                    onClick={handleClearFilters}
-                    className="px-3 py-2 bg-gray-750 text-gray-300 hover:text-blue-300 rounded border border-gray-700"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex justify-between items-center mb-4">
-              {/* Removed duplicate "Entity List" heading */}
-              
-              {filterTypeId && (
-                <button
-                  onClick={handleDeleteAllEntities}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-                >
-                  Delete All
-                </button>
-              )}
-            </div>
-            
-            {filteredEntities.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-400">No entities found.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredEntities
-                  .filter(entity => entity && entity.id) // Extra validation filter
-                  .map(entity => (
-                    <EntityCard 
-                      key={entity.id}
-                      entity={entity}
-                      isSelected={selectedEntityIds.includes(entity.id)}
-                      onSelect={handleSelectEntity}
-                      onEdit={handleEditEntity}
-                      onDelete={handleDeleteEntity}
-                    />
-                  ))}
-              </div>
-            )}
+        {loading && (
+          <div className="flex justify-center items-center p-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
-        </div>
+        )}
+        
+        {!loading && filteredEntities.length === 0 && (
+          <div className="text-center p-8 bg-gray-800 rounded-lg border border-gray-700">
+            <p className="text-gray-400">No entities found.</p>
+            <button
+              onClick={() => setGeneratingEntities(true)}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+            >
+              Generate Entities
+            </button>
+          </div>
+        )}
+        
+        {filteredEntities.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredEntities.map(entity => (
+              <EntityCard 
+                key={entity.id}
+                entity={entity}
+                isSelected={selectedEntities.includes(entity.id)}
+                onSelect={handleSelectEntity}
+                onViewDetails={handleViewEntity}
+                onDelete={handleDeleteEntity}
+              />
+            ))}
+          </div>
+        )}
       </div>
       
-      {/* Entity Edit Modal */}
-      {editingEntity && editingEntityType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h2 className="text-xl font-semibold text-blue-300 mb-4">
-                Edit Entity: {editingEntity.name}
-              </h2>
-              
-              <EntityForm 
-                entity={editingEntity}
-                entityType={editingEntityType}
-                onSave={handleUpdateEntity}
-                onCancel={() => {
-                  setEditingEntity(null);
-                  setEditingEntityType(null);
-                }}
-              />
-            </div>
-            
-            <div className="bg-gray-850 px-6 py-4 border-t border-gray-700 flex justify-end">
-              <button 
-                onClick={() => {
-                  setEditingEntity(null);
-                  setEditingEntityType(null);
-                }}
-                className="px-4 py-2 border border-gray-600 rounded text-gray-300 hover:text-gray-200"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Delete Confirmation Modal */}
-      {deleteConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6 w-full max-w-md">
-            <h3 className="text-xl font-semibold text-red-400 mb-4">Confirm Deletion</h3>
-            
-            <p className="text-gray-300 mb-6">
-              {deleteConfirmation.isAll 
-                ? `Are you sure you want to delete ALL entities of type "${deleteConfirmation.typeName}"? This action cannot be undone.`
-                : `Are you sure you want to delete "${deleteConfirmation.name}"? This action cannot be undone.`}
-            </p>
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={cancelDelete}
-                className="px-4 py-2 border border-gray-600 rounded text-gray-300 hover:border-gray-500 hover:text-gray-200"
-                disabled={deleting}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded flex items-center"
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Deleting...
-                  </>
-                ) : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Detail Modal */}
+      {/* Entity detail modal */}
       {viewingEntity && (
         <EntityDetail 
-          entity={viewingEntity} 
+          entity={viewingEntity}
+          entityType={entityTypes.find(t => t.id === viewingEntity.entity_type_id)}
           onClose={() => setViewingEntity(null)}
+          onSave={handleUpdateEntity}
         />
       )}
     </div>

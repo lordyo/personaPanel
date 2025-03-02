@@ -1,112 +1,188 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 
 /**
- * Component for displaying an entity instance in a card format.
+ * Component for displaying an entity instance in a card format
  * 
  * @param {Object} props - Component props
- * @param {Object} props.entity - The entity instance to display
- * @param {boolean} props.isSelected - Whether the entity is selected
- * @param {Function} props.onSelect - Function to call when the card is selected
- * @param {Function} props.onEdit - Function to call when the edit button is clicked
- * @param {Function} props.onDelete - Function to call when the delete button is clicked
+ * @param {Object} props.entity - Entity data to display
+ * @param {boolean} props.isSelected - Whether this entity is selected
+ * @param {Function} props.onSelect - Function to call when this entity is selected
+ * @param {Function} props.onViewDetails - Function to call when viewing details
+ * @param {Function} props.onDelete - Function to call when deleting this entity
  * @returns {JSX.Element} - Rendered component
  */
-const EntityCard = ({ entity, isSelected, onSelect, onEdit, onDelete }) => {
-  // Log entity data for debugging
-  useEffect(() => {
-    if (entity && entity.id) {
-      console.log(`Entity ${entity.id} data:`, entity);
-      console.log(`Entity ${entity.id} attributes:`, entity.attributes);
-    } else if (entity) {
-      console.warn("Entity missing ID:", entity);
-    }
-  }, [entity]);
+const EntityCard = ({ 
+  entity, 
+  isSelected, 
+  onSelect, 
+  onViewDetails,
+  onDelete 
+}) => {
+  if (!entity) return null;
 
-  // Return null if entity is undefined or missing critical properties
-  if (!entity || !entity.id) {
-    console.error("Received invalid entity data:", entity);
-    return null;
-  }
-
-  // Get a few key attributes to display in the card
-  const getDisplayAttributes = () => {
-    if (!entity.attributes) {
-      return [];
-    }
-
-    // Make sure we're working with an object
+  // Extract key attributes to display in card
+  const displayAttributes = () => {
+    if (!entity.attributes) return [];
+    
+    // Log entity data for debugging
+    console.log("Entity data:", entity);
+    
+    // Get at most 3 key attributes to show
+    const attributesToShow = [];
     const attributes = entity.attributes;
-    if (typeof attributes !== 'object') {
-      console.error('Attributes is not an object:', attributes);
-      return [];
-    }
     
-    // Direct approach - just get the entries and display them
-    return Object.entries(attributes)
-      .slice(0, 3)
-      .map(([key, value]) => (
-        <div key={`${entity.id}-${key}`} className="text-sm">
-          <span className="font-medium text-gray-400">{key}: </span>
-          <span className="text-gray-300">
-            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-          </span>
-        </div>
-      ));
+    // Add any numerical attributes that might be interesting
+    Object.entries(attributes).forEach(([key, value]) => {
+      // Skip long text fields and private fields
+      if (typeof value === 'string' && value.length > 50) return;
+      if (key.startsWith('_')) return;
+      
+      // Format the value for display
+      let displayValue = value;
+      if (typeof value === 'boolean') {
+        displayValue = value ? 'Yes' : 'No';
+      } else if (value === null || value === undefined) {
+        displayValue = 'N/A';
+      } else if (typeof value === 'object') {
+        displayValue = JSON.stringify(value);
+      } else {
+        displayValue = String(value);
+      }
+      
+      attributesToShow.push({ key, value: displayValue });
+      
+      // Limit to 3 attributes
+      if (attributesToShow.length >= 3) return;
+    });
+    
+    return attributesToShow;
   };
   
-  // Count actual attributes
-  const getAttributeCount = () => {
-    if (!entity.attributes) {
-      return 0;
-    }
-    
-    return Object.keys(entity.attributes).length;
+  const attributes = displayAttributes();
+  
+  const handleCheckboxClick = (e) => {
+    // Stop event propagation to prevent card click
+    e.stopPropagation();
+    onSelect(entity.id);
   };
   
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete "${entity.name}"?`)) {
+      onDelete(entity.id);
+    }
+  };
+  
+  const handleViewDetailsClick = (e) => {
+    e.stopPropagation();
+    onViewDetails(entity);
+  };
+
   return (
-    <div 
-      className={`border rounded-lg p-4 mb-3 cursor-pointer transition-colors bg-gray-800 border-gray-700 ${
-        isSelected ? 'border-blue-400 ring-1 ring-blue-400' : 'hover:border-gray-600 hover:bg-gray-750'
-      }`}
-      onClick={() => onSelect(entity.id)}
-    >
-      <div className="flex justify-between items-start">
-        <h3 className="text-lg font-semibold text-blue-300">{entity.name || 'Unnamed Entity'}</h3>
+    <div className={`bg-gray-800 border rounded-lg overflow-hidden transition-all duration-200 ${
+      isSelected ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-gray-700 hover:border-gray-600'
+    }`}>
+      {/* Card header with selection checkbox */}
+      <div className="p-4 flex items-start justify-between">
+        <div className="flex items-center">
+          <div 
+            className="mr-3 flex-shrink-0"
+            onClick={handleCheckboxClick}
+          >
+            <div className={`w-5 h-5 border rounded flex items-center justify-center cursor-pointer ${
+              isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-600 hover:border-gray-500'
+            }`}>
+              {isSelected && (
+                <svg 
+                  className="w-3 h-3 text-white" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth="2" 
+                    d="M5 13l4 4L19 7" 
+                  />
+                </svg>
+              )}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-blue-300 font-medium text-lg">{entity.name}</h3>
+            <div className="text-gray-400 text-sm">
+              {entity.entity_type_name || "Unknown Type"}
+            </div>
+          </div>
+        </div>
+        
         <div className="flex space-x-2">
-          <button 
-            className="text-blue-400 hover:text-blue-300 text-sm"
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent card selection
-              onEdit(entity.id);
-            }}
+          <button
+            onClick={handleViewDetailsClick}
+            className="text-blue-400 hover:text-blue-300"
+            title="View Details"
           >
-            Edit
+            <svg 
+              className="w-5 h-5" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth="2" 
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" 
+              />
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth="2" 
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" 
+              />
+            </svg>
           </button>
-          <button 
-            className="text-red-400 hover:text-red-300 text-sm"
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent card selection
-              onDelete(entity.id);
-            }}
+          <button
+            onClick={handleDeleteClick}
+            className="text-red-400 hover:text-red-300"
+            title="Delete Entity"
           >
-            Delete
+            <svg 
+              className="w-5 h-5" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth="2" 
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+              />
+            </svg>
           </button>
         </div>
       </div>
       
-      <p className="text-gray-300 text-sm mb-2">Type: {entity.entity_type_name || 'Unknown Type'}</p>
-      
-      {entity.description && (
-        <p className="text-gray-400 text-sm mb-2 line-clamp-2 overflow-hidden">
-          {entity.description.substring(0, 150)}{entity.description.length > 150 ? '...' : ''}
-        </p>
-      )}
-      
-      <div className="mt-2 space-y-1">
-        {getDisplayAttributes()}
-        {getAttributeCount() > 3 && (
-          <div className="text-sm text-gray-500">
-            + {getAttributeCount() - 3} more attributes
+      {/* Card body with entity preview */}
+      <div className="px-4 pb-4">
+        {entity.description && (
+          <p className="text-gray-300 text-sm mb-3">
+            {entity.description.length > 100 
+              ? `${entity.description.substring(0, 100)}...` 
+              : entity.description}
+          </p>
+        )}
+        
+        {attributes.length > 0 && (
+          <div className="grid grid-cols-1 gap-2">
+            {attributes.map((attr, index) => (
+              <div key={index} className="flex justify-between text-sm">
+                <span className="text-gray-400">{attr.key}:</span>
+                <span className="text-gray-300 font-medium">{attr.value}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>

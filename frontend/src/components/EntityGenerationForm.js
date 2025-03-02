@@ -5,22 +5,51 @@ import React, { useState, useEffect } from 'react';
  * 
  * @param {Object} props - Component props
  * @param {Array} props.entityTypes - Available entity types 
- * @param {Function} props.onGenerate - Function to call to generate entities
+ * @param {Function} props.onSubmit - Function to call to generate entities
+ * @param {boolean} props.disabled - Whether the form is disabled
  * @returns {JSX.Element} - Rendered component
  */
-const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
+const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
   const [entityTypeId, setEntityTypeId] = useState('');
   const [entityDescription, setEntityDescription] = useState('');
   const [count, setCount] = useState(1);
   const [variability, setVariability] = useState(0.5);
   const [error, setError] = useState('');
   
-  // Set default selected entity type if available
+  // Load saved settings from localStorage when component mounts
   useEffect(() => {
-    if (entityTypes.length > 0 && !entityTypeId) {
+    // Load entityTypeId if saved
+    const savedEntityTypeId = localStorage.getItem('entityGenerationSettings.entityTypeId');
+    // Load count if saved
+    const savedCount = localStorage.getItem('entityGenerationSettings.count');
+    // Load variability if saved
+    const savedVariability = localStorage.getItem('entityGenerationSettings.variability');
+    
+    // Apply saved settings if they exist
+    if (savedEntityTypeId) {
+      // Only set if it's a valid entity type id
+      if (entityTypes.some(type => type.id === savedEntityTypeId)) {
+        setEntityTypeId(savedEntityTypeId);
+      }
+    } else if (entityTypes.length > 0) {
+      // Default to first entity type if no saved type
       setEntityTypeId(entityTypes[0].id);
     }
-  }, [entityTypes, entityTypeId]);
+    
+    if (savedCount) {
+      const parsedCount = parseInt(savedCount);
+      if (!isNaN(parsedCount) && parsedCount >= 1 && parsedCount <= 20) {
+        setCount(parsedCount);
+      }
+    }
+    
+    if (savedVariability) {
+      const parsedVariability = parseFloat(savedVariability);
+      if (!isNaN(parsedVariability) && parsedVariability >= 0 && parsedVariability <= 1) {
+        setVariability(parsedVariability);
+      }
+    }
+  }, [entityTypes]);
   
   // Update description when entity type changes
   useEffect(() => {
@@ -29,8 +58,21 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
       if (selectedType && selectedType.description) {
         setEntityDescription(selectedType.description);
       }
+      
+      // Save entityTypeId to localStorage
+      localStorage.setItem('entityGenerationSettings.entityTypeId', entityTypeId);
     }
   }, [entityTypeId, entityTypes]);
+  
+  // Save count to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('entityGenerationSettings.count', count.toString());
+  }, [count]);
+  
+  // Save variability to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('entityGenerationSettings.variability', variability.toString());
+  }, [variability]);
   
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -51,7 +93,7 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
     }
     
     setError('');
-    onGenerate({
+    onSubmit({
       entityTypeId,
       entityDescription,
       count,
@@ -76,6 +118,7 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
           value={entityTypeId}
           onChange={(e) => setEntityTypeId(e.target.value)}
           className="w-full bg-gray-750 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
+          disabled={disabled}
         >
           <option value="">Select an entity type</option>
           {entityTypes.map(type => (
@@ -96,6 +139,7 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
           value={entityDescription}
           onChange={(e) => setEntityDescription(e.target.value)}
           className="w-full bg-gray-750 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500 min-h-[80px]"
+          disabled={disabled}
         />
         <p className="text-xs text-gray-500 mt-1">
           Prepopulated with the entity type description. You can modify it to further guide generation.
@@ -114,6 +158,7 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
           value={count}
           onChange={(e) => setCount(parseInt(e.target.value))}
           className="w-full"
+          disabled={disabled}
         />
         <div className="flex justify-between text-xs text-gray-500 mt-1">
           <span>1</span>
@@ -135,6 +180,7 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
           value={variability}
           onChange={(e) => setVariability(parseFloat(e.target.value))}
           className="w-full"
+          disabled={disabled}
         />
         <div className="flex justify-between text-xs text-gray-500 mt-1">
           <span>Low</span>
@@ -145,9 +191,10 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
       
       <button
         type="submit"
-        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+        disabled={disabled}
       >
-        Generate Entities
+        {disabled ? 'Generating...' : 'Generate Entities'}
       </button>
     </form>
   );
