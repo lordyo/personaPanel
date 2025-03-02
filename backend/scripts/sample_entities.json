@@ -1,0 +1,35 @@
+[
+  {
+    "id": "entity-001",
+    "name": "Alex Chen",
+    "attributes": {
+      "age": 32,
+      "profession": "Software Engineer",
+      "personality": "Analytical, curious, and introverted. Alex enjoys solving complex problems and tends to think deeply before speaking.",
+      "background": "Grew up in a tech-focused household and pursued computer science from an early age. Has worked for several tech startups and values innovation.",
+      "goals": "To create meaningful technology that improves people's lives while maintaining a healthy work-life balance."
+    }
+  },
+  {
+    "id": "entity-002",
+    "name": "Morgan Taylor",
+    "attributes": {
+      "age": 28,
+      "profession": "Marketing Specialist",
+      "personality": "Creative, outgoing, and persuasive. Morgan is quick-thinking and enjoys collaborative environments.",
+      "background": "Studied communications and worked in various marketing roles. Has a talent for understanding consumer psychology and trends.",
+      "goals": "To lead innovative marketing campaigns and eventually start a consulting agency."
+    }
+  },
+  {
+    "id": "entity-003",
+    "name": "Jordan Rivera",
+    "attributes": {
+      "age": 45,
+      "profession": "Clinical Psychologist",
+      "personality": "Empathetic, patient, and observant. Jordan has a calming presence and listens more than speaks.",
+      "background": "Became interested in psychology after volunteering with crisis support services. Has a private practice and also teaches part-time.",
+      "goals": "To help people overcome mental health challenges and reduce stigma around seeking help."
+    }
+  }
+] 

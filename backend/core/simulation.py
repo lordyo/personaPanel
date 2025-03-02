@@ -9,6 +9,15 @@ from dataclasses import dataclass
 from enum import Enum
 import uuid
 import datetime
+import logging
+from backend.llm.simulation_modules import (
+    SoloInteractionSimulator,
+    DyadicInteractionSimulator,
+    GroupInteractionSimulator
+)
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class InteractionType(Enum):
@@ -64,14 +73,11 @@ class SimulationEngine:
     prompts, sending them to the LLM, and processing results.
     """
     
-    def __init__(self, llm_module):
-        """
-        Initialize the simulation engine.
-        
-        Args:
-            llm_module: The LLM integration module to use for generating content
-        """
-        self.llm_module = llm_module
+    def __init__(self):
+        """Initialize the simulation engine."""
+        self.solo_simulator = SoloInteractionSimulator()
+        self.dyadic_simulator = DyadicInteractionSimulator()
+        self.group_simulator = GroupInteractionSimulator()
     
     def create_context(self, description: str, metadata: Optional[Dict[str, Any]] = None) -> Context:
         """
@@ -94,7 +100,8 @@ class SimulationEngine:
         self,
         context: Context,
         entities: List[Dict[str, Any]],
-        interaction_type: InteractionType = InteractionType.SOLO
+        interaction_type: InteractionType = InteractionType.SOLO,
+        previous_interaction: Optional[str] = None
     ) -> SimulationResult:
         """
         Run a simulation with the given entities in the provided context.
@@ -103,43 +110,82 @@ class SimulationEngine:
             context: The context in which the entities will interact
             entities: List of entity instances to include in the simulation
             interaction_type: The type of interaction to simulate
+            previous_interaction: Optional previous interaction content
             
         Returns:
             The result of the simulation
         """
-        # This is a stub implementation - the actual LLM integration
-        # will be implemented in future sprints
+        content = ""
+        scratchpad = ""
+        entity_ids = [entity.get('id', f"unknown-{i}") for i, entity in enumerate(entities)]
         
-        if interaction_type == InteractionType.SOLO:
-            if len(entities) != 1:
-                raise ValueError("Solo interaction requires exactly one entity")
+        try:
+            if interaction_type == InteractionType.SOLO:
+                if len(entities) != 1:
+                    raise ValueError("Solo interaction requires exactly one entity")
                 
-            # In a real implementation, this would call the LLM
-            content = f"Solo simulation for {entities[0]['name']} in context: {context.description}"
+                # Use the solo interaction simulator
+                result = self.solo_simulator(
+                    entity=entities[0],
+                    context=context.description,
+                    previous_interaction=previous_interaction
+                )
+                content = result.content
+                scratchpad = result.scratchpad
+                
+            elif interaction_type == InteractionType.DYADIC:
+                if len(entities) != 2:
+                    raise ValueError("Dyadic interaction requires exactly two entities")
+                
+                # Use the dyadic interaction simulator
+                result = self.dyadic_simulator(
+                    entity1=entities[0],
+                    entity2=entities[1],
+                    context=context.description,
+                    previous_interaction=previous_interaction
+                )
+                content = result.content
+                scratchpad = result.scratchpad
+                
+            elif interaction_type == InteractionType.GROUP:
+                if len(entities) < 2:
+                    raise ValueError("Group interaction requires at least two entities")
+                
+                # Use the group interaction simulator
+                result = self.group_simulator(
+                    entities=entities,
+                    context=context.description,
+                    previous_interaction=previous_interaction
+                )
+                content = result.content
+                scratchpad = result.scratchpad
             
-        elif interaction_type == InteractionType.DYADIC:
-            if len(entities) != 2:
-                raise ValueError("Dyadic interaction requires exactly two entities")
-                
-            # In a real implementation, this would call the LLM
-            content = f"Dyadic simulation between {entities[0]['name']} and {entities[1]['name']} in context: {context.description}"
-            
-        elif interaction_type == InteractionType.GROUP:
-            if len(entities) < 2:
-                raise ValueError("Group interaction requires at least two entities")
-                
-            # In a real implementation, this would call the LLM
-            entity_names = [entity['name'] for entity in entities]
-            content = f"Group simulation with {', '.join(entity_names)} in context: {context.description}"
+            else:
+                raise ValueError(f"Unknown interaction type: {interaction_type}")
         
-        else:
-            raise ValueError(f"Unknown interaction type: {interaction_type}")
+        except Exception as e:
+            logger.error(f"Error in simulation: {str(e)}")
+            # Return a minimal result with error information
+            return SimulationResult(
+                id=str(uuid.uuid4()),
+                timestamp=datetime.datetime.now(),
+                context_id=context.id,
+                interaction_type=interaction_type.value,
+                entity_ids=entity_ids,
+                content=f"Error in simulation: {str(e)}",
+                metadata={"error": str(e)}
+            )
         
+        # Create and return the simulation result
         return SimulationResult(
             id=str(uuid.uuid4()),
             timestamp=datetime.datetime.now(),
             context_id=context.id,
             interaction_type=interaction_type.value,
-            entity_ids=[entity.get('id') for entity in entities],
-            content=content
+            entity_ids=entity_ids,
+            content=content,
+            metadata={
+                "scratchpad": scratchpad,
+                "previous_interaction": previous_interaction
+            }
         ) 
