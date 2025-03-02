@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { entityTypeApi } from '../services/api';
 import LoadingIndicator from '../components/LoadingIndicator';
+import DimensionForm from '../components/DimensionForm';
 
 /**
  * Page component for editing an existing entity type.
@@ -24,9 +25,6 @@ const EntityTypeEdit = () => {
   const [nameError, setNameError] = useState('');
   const [dimensionsError, setDimensionsError] = useState('');
 
-  // Store raw option input for categorical dimensions
-  const [rawOptions, setRawOptions] = useState({});
-
   useEffect(() => {
     const fetchEntityType = async () => {
       try {
@@ -35,7 +33,30 @@ const EntityTypeEdit = () => {
           const entityType = response.data;
           setName(entityType.name);
           setDescription(entityType.description || '');
-          setDimensions(entityType.dimensions || []);
+          
+          // Convert legacy 'numerical' types to 'float' to ensure backward compatibility
+          const updatedDimensions = (entityType.dimensions || []).map(dim => {
+            if (dim.type === 'numerical') {
+              return {
+                ...dim,
+                type: 'float',
+                distribution: dim.distribution || 'normal',
+                min_value: dim.min_value !== undefined ? dim.min_value : 0,
+                max_value: dim.max_value !== undefined ? dim.max_value : 100,
+                std_deviation: dim.std_deviation || (dim.max_value - dim.min_value) / 6
+              };
+            }
+            // Add default true_percentage for boolean types
+            if (dim.type === 'boolean' && dim.true_percentage === undefined) {
+              return {
+                ...dim,
+                true_percentage: 0.5
+              };
+            }
+            return dim;
+          });
+          
+          setDimensions(updatedDimensions);
           setError(null);
         } else {
           console.error('Error fetching entity type:', response?.message || 'Unknown error');
@@ -78,6 +99,88 @@ const EntityTypeEdit = () => {
       if (dimension.type === 'categorical' && (!dimension.options || dimension.options.length === 0)) {
         dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" needs at least one option`);
         isValid = false;
+      }
+
+      if (dimension.type === 'int' || dimension.type === 'float') {
+        if (dimension.min_value === undefined || dimension.max_value === undefined) {
+          dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" needs min and max values`);
+          isValid = false;
+        }
+        
+        if (dimension.min_value >= dimension.max_value) {
+          dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" min value must be less than max value`);
+          isValid = false;
+        }
+        
+        if (dimension.distribution === 'normal') {
+          // Check for either spread_factor (new) or std_deviation (legacy)
+          if (dimension.spread_factor !== undefined) {
+            if (dimension.spread_factor <= 0 || dimension.spread_factor > 1) {
+              dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" spread factor must be between 0 and 1`);
+              isValid = false;
+            }
+          } else if (dimension.std_deviation !== undefined) {
+            if (dimension.std_deviation <= 0) {
+              dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" needs a positive standard deviation for normal distribution`);
+              isValid = false;
+            }
+          } else {
+            dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" needs a spread factor for normal distribution`);
+            isValid = false;
+          }
+        }
+      }
+      
+      // Legacy numerical type validation
+      if (dimension.type === 'numerical') {
+        if (dimension.min_value === undefined || dimension.max_value === undefined) {
+          dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" needs min and max values`);
+          isValid = false;
+        }
+        
+        if (dimension.min_value >= dimension.max_value) {
+          dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" min value must be less than max value`);
+          isValid = false;
+        }
+      }
+      
+      if (dimension.type === 'boolean' && dimension.true_percentage !== undefined) {
+        if (dimension.true_percentage < 0 || dimension.true_percentage > 1) {
+          dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" true percentage must be between 0 and 1`);
+          isValid = false;
+        }
+      }
+      
+      if (dimension.type === 'categorical' && dimension.distribution_values) {
+        // Check if all options have distribution values
+        const allOptionsHaveValues = dimension.options.every(option => 
+          dimension.distribution_values && dimension.distribution_values[option] !== undefined
+        );
+        
+        if (!allOptionsHaveValues) {
+          // Auto-fill missing values with equal distribution
+          const totalOptions = dimension.options.length;
+          const equalShare = 1 / totalOptions;
+          const updatedValues = { ...dimension.distribution_values };
+          
+          dimension.options.forEach(option => {
+            if (!updatedValues[option]) {
+              updatedValues[option] = equalShare;
+            }
+          });
+          
+          dimension.distribution_values = updatedValues;
+        }
+        
+        // Normalize values to ensure they sum to 1
+        const totalPercentage = Object.values(dimension.distribution_values).reduce((sum, val) => sum + val, 0);
+        if (Math.abs(totalPercentage - 1) > 0.01) {
+          const normalizedValues = {};
+          Object.keys(dimension.distribution_values).forEach(key => {
+            normalizedValues[key] = dimension.distribution_values[key] / totalPercentage;
+          });
+          dimension.distribution_values = normalizedValues;
+        }
       }
     });
     
@@ -135,9 +238,8 @@ const EntityTypeEdit = () => {
       ...dimensions, 
       { 
         name: '', 
-        type: 'categorical', 
-        description: '',
-        options: []
+        type: '', 
+        description: ''
       }
     ]);
   };
@@ -146,26 +248,10 @@ const EntityTypeEdit = () => {
     setDimensions(dimensions.filter((_, i) => i !== index));
   };
 
-  const handleDimensionChange = (index, field, value) => {
+  const handleUpdateDimension = (index, updatedDimension) => {
     const newDimensions = [...dimensions];
-    newDimensions[index] = {
-      ...newDimensions[index],
-      [field]: value
-    };
+    newDimensions[index] = updatedDimension;
     setDimensions(newDimensions);
-  };
-
-  // Helper function to handle categorical options input
-  const handleOptionsChange = (index, value) => {
-    // Update raw options state
-    setRawOptions({
-      ...rawOptions,
-      [index]: value
-    });
-    
-    // Process the options and update dimension
-    const options = value.split(',').map(item => item.trim()).filter(Boolean);
-    handleDimensionChange(index, 'options', options);
   };
 
   if (loading) {
@@ -276,123 +362,12 @@ const EntityTypeEdit = () => {
             ) : (
               <div className="space-y-6">
                 {dimensions.map((dimension, index) => (
-                  <div key={index} className="bg-gray-750 rounded-lg p-5 border border-gray-700">
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-medium text-blue-300">Dimension {index + 1}</h3>
-                      <button 
-                        onClick={() => handleRemoveDimension(index)}
-                        className="p-1 rounded text-red-400 hover:bg-red-400 hover:bg-opacity-10"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-gray-400 text-sm font-medium mb-2">
-                          Name *
-                        </label>
-                        <input 
-                          type="text" 
-                          value={dimension.name}
-                          onChange={(e) => handleDimensionChange(index, 'name', e.target.value)}
-                          className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
-                          placeholder="Dimension Name"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-gray-400 text-sm font-medium mb-2">
-                          Type *
-                        </label>
-                        <select 
-                          value={dimension.type}
-                          onChange={(e) => handleDimensionChange(index, 'type', e.target.value)}
-                          className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
-                        >
-                          <option value="categorical">Categorical</option>
-                          <option value="numerical">Numerical</option>
-                          <option value="boolean">Boolean</option>
-                          <option value="text">Text</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <label className="block text-gray-400 text-sm font-medium mb-2">
-                        Description
-                      </label>
-                      <input 
-                        type="text" 
-                        value={dimension.description || ''}
-                        onChange={(e) => handleDimensionChange(index, 'description', e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
-                        placeholder="Optional description"
-                      />
-                    </div>
-                    
-                    {dimension.type === 'categorical' && (
-                      <div>
-                        <label className="block text-gray-400 text-sm font-medium mb-2">
-                          Options * (separate with commas)
-                        </label>
-                        <textarea 
-                          value={rawOptions[index] || (dimension.options || []).join(', ')}
-                          onChange={(e) => handleOptionsChange(index, e.target.value)}
-                          className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
-                          rows="4"
-                          placeholder="Enter options separated by commas (e.g. Red, Green, Blue)"
-                        />
-                      </div>
-                    )}
-                    
-                    {dimension.type === 'numerical' && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-gray-400 text-sm font-medium mb-2">
-                            Min Value
-                          </label>
-                          <input 
-                            type="number" 
-                            value={dimension.min !== undefined ? dimension.min : ''}
-                            onChange={(e) => handleDimensionChange(index, 'min', parseFloat(e.target.value))}
-                            className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
-                            placeholder="Minimum value"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 text-sm font-medium mb-2">
-                            Max Value
-                          </label>
-                          <input 
-                            type="number" 
-                            value={dimension.max !== undefined ? dimension.max : ''}
-                            onChange={(e) => handleDimensionChange(index, 'max', parseFloat(e.target.value))}
-                            className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
-                            placeholder="Maximum value"
-                          />
-                        </div>
-                      </div>
-                    )}
-                    
-                    {dimension.type === 'boolean' && (
-                      <div>
-                        <label className="block text-gray-400 text-sm font-medium mb-2">
-                          Default Value
-                        </label>
-                        <select 
-                          value={dimension.defaultValue ? 'true' : 'false'}
-                          onChange={(e) => handleDimensionChange(index, 'defaultValue', e.target.value === 'true')}
-                          className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500"
-                        >
-                          <option value="true">True</option>
-                          <option value="false">False</option>
-                        </select>
-                      </div>
-                    )}
-                  </div>
+                  <DimensionForm
+                    key={index}
+                    dimension={dimension}
+                    onChange={(updatedDimension) => handleUpdateDimension(index, updatedDimension)}
+                    onRemove={() => handleRemoveDimension(index)}
+                  />
                 ))}
               </div>
             )}

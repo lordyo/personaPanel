@@ -232,6 +232,53 @@ def create_entity_type():
     for dim in dimensions:
         if not dim.get('name') or not dim.get('type'):
             return error_response("Each dimension must have a name and type")
+        
+        dim_type = dim.get('type')
+        
+        # Validate categorical dimensions
+        if dim_type == 'categorical' and (not dim.get('options') or not isinstance(dim.get('options'), list)):
+            return error_response(f"Dimension '{dim.get('name')}' must have options as a list")
+            
+        # Validate numerical, int, and float dimensions
+        if dim_type in ['numerical', 'int', 'float']:
+            if 'min_value' not in dim or 'max_value' not in dim:
+                return error_response(f"Dimension '{dim.get('name')}' must have min_value and max_value")
+                
+            if dim.get('min_value') >= dim.get('max_value'):
+                return error_response(f"Dimension '{dim.get('name')}' min_value must be less than max_value")
+                
+            # Validate distribution parameters
+            if dim.get('distribution') == 'normal':
+                # Check spread_factor (new approach)
+                if dim.get('spread_factor') is not None:
+                    if dim.get('spread_factor') <= 0 or dim.get('spread_factor') > 1:
+                        return error_response(f"Dimension '{dim.get('name')}' spread_factor must be between 0 and 1")
+                # Check std_deviation (legacy approach)
+                elif dim.get('std_deviation') is not None:
+                    if dim.get('std_deviation') <= 0:
+                        return error_response(f"Dimension '{dim.get('name')}' std_deviation must be positive")
+    
+    # Normalize categorical distribution values if needed
+    for dim in dimensions:
+        if dim.get('type') == 'categorical' and dim.get('distribution_values'):
+            options = dim.get('options', [])
+            distribution_values = dim.get('distribution_values', {})
+            
+            # Remove any distribution values for options that don't exist
+            keys_to_remove = [key for key in distribution_values if key not in options]
+            for key in keys_to_remove:
+                distribution_values.pop(key, None)
+                
+            # Add missing options with 0 value
+            for option in options:
+                if option not in distribution_values:
+                    distribution_values[option] = 0
+                    
+            # Normalize values to sum to 1
+            total = sum(distribution_values.values())
+            if total > 0:  # Avoid division by zero
+                for key in distribution_values:
+                    distribution_values[key] /= total
     
     entity_type_id = storage.save_entity_type(name, description, dimensions)
     logger.info(f"Created entity type: {name} (ID: {entity_type_id})")
@@ -295,6 +342,53 @@ def update_entity_type(entity_type_id):
     for dim in dimensions:
         if not dim.get('name') or not dim.get('type'):
             return error_response("Each dimension must have a name and type")
+            
+        dim_type = dim.get('type')
+        
+        # Validate categorical dimensions
+        if dim_type == 'categorical' and (not dim.get('options') or not isinstance(dim.get('options'), list)):
+            return error_response(f"Dimension '{dim.get('name')}' must have options as a list")
+            
+        # Validate numerical, int, and float dimensions
+        if dim_type in ['numerical', 'int', 'float']:
+            if 'min_value' not in dim or 'max_value' not in dim:
+                return error_response(f"Dimension '{dim.get('name')}' must have min_value and max_value")
+                
+            if dim.get('min_value') >= dim.get('max_value'):
+                return error_response(f"Dimension '{dim.get('name')}' min_value must be less than max_value")
+                
+            # Validate distribution parameters
+            if dim.get('distribution') == 'normal':
+                # Check spread_factor (new approach)
+                if dim.get('spread_factor') is not None:
+                    if dim.get('spread_factor') <= 0 or dim.get('spread_factor') > 1:
+                        return error_response(f"Dimension '{dim.get('name')}' spread_factor must be between 0 and 1")
+                # Check std_deviation (legacy approach)
+                elif dim.get('std_deviation') is not None:
+                    if dim.get('std_deviation') <= 0:
+                        return error_response(f"Dimension '{dim.get('name')}' std_deviation must be positive")
+    
+    # Normalize categorical distribution values if needed
+    for dim in dimensions:
+        if dim.get('type') == 'categorical' and dim.get('distribution_values'):
+            options = dim.get('options', [])
+            distribution_values = dim.get('distribution_values', {})
+            
+            # Remove any distribution values for options that don't exist
+            keys_to_remove = [key for key in distribution_values if key not in options]
+            for key in keys_to_remove:
+                distribution_values.pop(key, None)
+                
+            # Add missing options with 0 value
+            for option in options:
+                if option not in distribution_values:
+                    distribution_values[option] = 0
+                    
+            # Normalize values to sum to 1
+            total = sum(distribution_values.values())
+            if total > 0:  # Avoid division by zero
+                for key in distribution_values:
+                    distribution_values[key] /= total
     
     # Update the entity type
     storage.update_entity_type(entity_type_id, name, description, dimensions)

@@ -105,6 +105,18 @@ const EntityList = () => {
     });
   };
   
+  // New function to select all filtered entities
+  const selectAll = () => {
+    // Get all the IDs from the filtered entities
+    const allFilteredIds = filteredEntities.map(entity => entity.id);
+    setSelectedEntities(allFilteredIds);
+  };
+  
+  // New function to deselect all entities
+  const selectNone = () => {
+    setSelectedEntities([]);
+  };
+  
   const handleViewEntity = (entity) => {
     setViewingEntity(entity);
   };
@@ -373,7 +385,7 @@ const EntityList = () => {
             {selectedEntities.length > 0 && (
               <button
                 onClick={() => handleDeleteSelected()}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none mr-3"
               >
                 Delete Selected ({selectedEntities.length})
               </button>
@@ -430,7 +442,29 @@ const EntityList = () => {
       
       {/* Entity list */}
       <div>
-        <h2 className="text-2xl font-bold text-white mb-4">Entities</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-white">Entities</h2>
+          
+          {/* Select All/None buttons */}
+          {filteredEntities.length > 0 && (
+            <div className="inline-flex rounded-md shadow-sm" role="group">
+              <button
+                onClick={selectAll}
+                className="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-l focus:outline-none"
+                title="Select all entities"
+              >
+                Select All
+              </button>
+              <button
+                onClick={selectNone}
+                className="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-r focus:outline-none border-l border-gray-600"
+                title="Deselect all entities"
+              >
+                Select None
+              </button>
+            </div>
+          )}
+        </div>
         
         {loading && !entities.length && (
           <div className="flex justify-center items-center p-8">

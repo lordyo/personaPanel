@@ -12,8 +12,12 @@ class DimensionType(Enum):
     """Enumeration of supported dimension types."""
     BOOLEAN = "boolean"
     CATEGORICAL = "categorical"
-    NUMERICAL = "numerical"
+    INT = "int"
+    FLOAT = "float"
     TEXT = "text"
+    
+    # Legacy type for backwards compatibility
+    NUMERICAL = "numerical"
 
 
 def validate_dimension_config(dimension_type: str, config: Dict[str, Any]) -> bool:

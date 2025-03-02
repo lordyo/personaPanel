@@ -49,6 +49,139 @@ const EntityTypeDetail = () => {
     navigate(`/entity-types/${id}/edit`);
   };
 
+  // Helper function to render dimension-specific details
+  const renderDimensionDetails = (dimension) => {
+    switch (dimension.type) {
+      case 'categorical':
+        return (
+          <>
+            {dimension.options && (
+              <div className="mt-3">
+                <div className="text-xs font-medium text-gray-500 mb-1">Options:</div>
+                <div className="flex flex-wrap gap-1">
+                  {dimension.options.map((option, i) => (
+                    <span key={i} className="text-xs bg-gray-700 rounded px-2 py-1 text-gray-300">
+                      {option}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {dimension.distribution_values && (
+              <div className="mt-3">
+                <div className="text-xs font-medium text-gray-500 mb-1">Distribution:</div>
+                <div className="text-xs text-gray-300 space-y-1">
+                  {dimension.options?.map(option => (
+                    <div key={option} className="flex items-center justify-between">
+                      <span>{option}:</span>
+                      <div className="flex items-center">
+                        <div className="w-24 h-2 bg-gray-700 rounded-full mr-2 overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-500" 
+                            style={{ width: `${(dimension.distribution_values[option] || 0) * 100}%` }}
+                          ></div>
+                        </div>
+                        <span>{Math.round((dimension.distribution_values[option] || 0) * 100)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+        
+      case 'int':
+      case 'float':
+      case 'numerical': // Support legacy numerical type
+        return (
+          <>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-xs font-medium text-gray-500">Min:</span>
+                <span className="ml-1 text-gray-300">{dimension.min_value !== undefined ? dimension.min_value : (dimension.min !== undefined ? dimension.min : 'None')}</span>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-500">Max:</span>
+                <span className="ml-1 text-gray-300">{dimension.max_value !== undefined ? dimension.max_value : (dimension.max !== undefined ? dimension.max : 'None')}</span>
+              </div>
+            </div>
+            
+            {dimension.distribution && (
+              <div className="mt-2">
+                <span className="text-xs font-medium text-gray-500">Distribution:</span>
+                <span className="ml-1 text-gray-300">{dimension.distribution}</span>
+                
+                {dimension.distribution === 'normal' && (
+                  <div className="mt-1">
+                    {dimension.spread_factor !== undefined ? (
+                      <>
+                        <span className="text-xs font-medium text-gray-500">Distribution Spread:</span>
+                        <span className="ml-1 text-gray-300">
+                          {dimension.spread_factor < 0.3 ? "Concentrated" : 
+                           dimension.spread_factor < 0.7 ? "Moderate" : "Spread out"}
+                          ({Math.round(dimension.spread_factor * 100)}%)
+                        </span>
+                      </>
+                    ) : dimension.std_deviation !== undefined && (
+                      <>
+                        <span className="text-xs font-medium text-gray-500">Std Deviation:</span>
+                        <span className="ml-1 text-gray-300">{dimension.std_deviation}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                
+                {dimension.distribution === 'skewed' && dimension.skew_factor !== undefined && (
+                  <div className="mt-1">
+                    <span className="text-xs font-medium text-gray-500">Skew Factor:</span>
+                    <span className="ml-1 text-gray-300">{dimension.skew_factor}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        );
+        
+      case 'boolean':
+        return (
+          <div className="mt-3">
+            {dimension.true_percentage !== undefined && (
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-xs font-medium text-gray-500">True:</span>
+                  <span className="text-xs text-gray-300">{Math.round(dimension.true_percentage * 100)}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500" 
+                    style={{ width: `${dimension.true_percentage * 100}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs font-medium text-gray-500">False:</span>
+                  <span className="text-xs text-gray-300">{Math.round((1 - dimension.true_percentage) * 100)}%</span>
+                </div>
+              </div>
+            )}
+            
+            {dimension.defaultValue !== undefined && (
+              <div className="mt-1">
+                <span className="text-xs font-medium text-gray-500">Default:</span>
+                <span className="ml-1 text-gray-300">
+                  {String(dimension.defaultValue)}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+        
+      default:
+        return null;
+    }
+  };
+
   if (loading) {
     return <LoadingIndicator message="Loading entity type..." fullPage />;
   }
@@ -126,42 +259,7 @@ const EntityTypeDetail = () => {
                         <p className="text-sm text-gray-400 mb-2">{dimension.description}</p>
                       )}
                       
-                      {dimension.type === 'categorical' && dimension.options && (
-                        <div className="mt-3">
-                          <div className="text-xs font-medium text-gray-500 mb-1">Options:</div>
-                          <div className="flex flex-wrap gap-1">
-                            {dimension.options.map((option, i) => (
-                              <span key={i} className="text-xs bg-gray-700 rounded px-2 py-1 text-gray-300">
-                                {option}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {dimension.type === 'numerical' && (
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-xs font-medium text-gray-500">Min:</span>
-                            <span className="ml-1 text-gray-300">{dimension.min !== undefined ? dimension.min : 'None'}</span>
-                          </div>
-                          <div>
-                            <span className="text-xs font-medium text-gray-500">Max:</span>
-                            <span className="ml-1 text-gray-300">{dimension.max !== undefined ? dimension.max : 'None'}</span>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {dimension.defaultValue !== undefined && (
-                        <div className="mt-3">
-                          <span className="text-xs font-medium text-gray-500">Default:</span>
-                          <span className="ml-1 text-gray-300">
-                            {typeof dimension.defaultValue === 'object' 
-                              ? JSON.stringify(dimension.defaultValue) 
-                              : String(dimension.defaultValue)}
-                          </span>
-                        </div>
-                      )}
+                      {renderDimensionDetails(dimension)}
                     </div>
                   ))}
                 </div>

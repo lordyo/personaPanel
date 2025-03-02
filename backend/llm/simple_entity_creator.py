@@ -167,9 +167,96 @@ def generate_dimension_values(dimensions: List[Dict]) -> Dict[str, Any]:
         dim_type = dim.get('type', 'text')
         dim_name = dim.get('name', '')
         
-        if dim_type == 'categorical' and 'options' in dim:
-            values[dim_name] = random.choice(dim['options'])
+        if dim_type == 'categorical':
+            if not 'options' in dim:
+                continue
+                
+            options = dim['options']
+            distribution_values = dim.get('distribution_values', {})
             
+            if distribution_values and all(option in distribution_values for option in options):
+                # Use provided distribution
+                weights = [distribution_values.get(option, 0) for option in options]
+                # Normalize weights to ensure they sum to 1
+                total = sum(weights)
+                if total > 0:
+                    normalized_weights = [w/total for w in weights]
+                    values[dim_name] = random.choices(options, weights=normalized_weights, k=1)[0]
+                else:
+                    # Fallback to uniform if weights sum to 0
+                    values[dim_name] = random.choice(options)
+            else:
+                # Uniform selection if no distribution values
+                values[dim_name] = random.choice(options)
+                
+        elif dim_type in ['int', 'float']:
+            min_val = dim.get('min_value', 0)
+            max_val = dim.get('max_value', 100)
+            distribution = dim.get('distribution', 'uniform')
+            
+            if distribution == 'uniform':
+                # Uniform distribution between min and max
+                if dim_type == 'int':
+                    values[dim_name] = random.randint(int(min_val), int(max_val))
+                else:
+                    values[dim_name] = random.uniform(min_val, max_val)
+                    
+            elif distribution == 'normal':
+                # Normal distribution with mean at center of range and specified std_deviation
+                mean = (min_val + max_val) / 2
+                
+                # Use spread_factor if available (new approach) or fall back to std_deviation (legacy)
+                if 'spread_factor' in dim:
+                    # Convert spread factor to appropriate standard deviation based on range
+                    spread_factor = dim.get('spread_factor', 0.5)  # 0=concentrated, 1=spread
+                    std_dev = spread_factor * (max_val - min_val) / 6
+                else:
+                    # Legacy behavior: use specified std_deviation or default
+                    std_dev = dim.get('std_deviation', (max_val - min_val) / 6)  # Default to range/6
+                
+                # Generate value and clip to min-max range
+                value = random.normalvariate(mean, std_dev)
+                value = max(min_val, min(max_val, value))
+                
+                if dim_type == 'int':
+                    values[dim_name] = int(round(value))
+                else:
+                    values[dim_name] = value
+                    
+            elif distribution == 'skewed':
+                # Skewed distribution using beta distribution with skew_factor
+                skew_factor = dim.get('skew_factor', 0)  # -5 to 5, 0 is symmetric
+                
+                if skew_factor == 0:
+                    # No skew, use uniform
+                    if dim_type == 'int':
+                        values[dim_name] = random.randint(int(min_val), int(max_val))
+                    else:
+                        values[dim_name] = random.uniform(min_val, max_val)
+                else:
+                    # Adjust alpha and beta parameters based on skew_factor
+                    if skew_factor < 0:  # Left skew
+                        alpha = 1 + abs(skew_factor)
+                        beta = 1.0
+                    else:  # Right skew
+                        alpha = 1.0
+                        beta = 1 + abs(skew_factor)
+                    
+                    # Generate value from beta distribution (0 to 1) and scale to range
+                    beta_value = random.betavariate(alpha, beta)
+                    scaled_value = min_val + beta_value * (max_val - min_val)
+                    
+                    if dim_type == 'int':
+                        values[dim_name] = int(round(scaled_value))
+                    else:
+                        values[dim_name] = scaled_value
+                
+        elif dim_type == 'boolean':
+            # Generate boolean based on true_percentage
+            true_percentage = dim.get('true_percentage', 0.5)
+            values[dim_name] = random.random() < true_percentage
+            
+        # Handle legacy 'numerical' type for backward compatibility    
         elif dim_type == 'numerical':
             min_val = dim.get('min_value', 0)
             max_val = dim.get('max_value', 100)
@@ -178,9 +265,6 @@ def generate_dimension_values(dimensions: List[Dict]) -> Dict[str, Any]:
             else:
                 values[dim_name] = round(random.uniform(min_val, max_val), 2)
                 
-        elif dim_type == 'boolean':
-            values[dim_name] = random.choice([True, False])
-            
         elif dim_type == 'text':
             # Skip text dimensions - they'll be generated by LLM
             pass

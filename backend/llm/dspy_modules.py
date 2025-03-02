@@ -87,15 +87,97 @@ class EntityGenerator(dspy.Module):
                 continue
             
             if dimension_type == 'boolean':
-                # Generate random boolean (True/False)
-                attributes[dimension_name] = random.choice([True, False])
+                # Generate boolean based on true_percentage
+                true_percentage = dim.get('true_percentage', 0.5)
+                attributes[dimension_name] = random.random() < true_percentage
                 
             elif dimension_type == 'categorical':
-                # Select a random option from the options list
+                # Select an option based on distribution_values if provided
                 options = dim.get('options', [])
-                if options:
+                if not options:
+                    continue
+                    
+                distribution_values = dim.get('distribution_values', {})
+                if distribution_values and all(option in distribution_values for option in options):
+                    # Use provided distribution
+                    weights = [distribution_values.get(option, 0) for option in options]
+                    # Normalize weights to ensure they sum to 1
+                    total = sum(weights)
+                    if total > 0:
+                        normalized_weights = [w/total for w in weights]
+                        attributes[dimension_name] = random.choices(options, weights=normalized_weights, k=1)[0]
+                    else:
+                        # Fallback to uniform if weights sum to 0
+                        attributes[dimension_name] = random.choice(options)
+                else:
+                    # Uniform selection if no distribution values
                     attributes[dimension_name] = random.choice(options)
                 
+            elif dimension_type in ['int', 'float']:
+                # Generate a number based on the distribution
+                min_val = float(dim.get('min_value', 0))
+                max_val = float(dim.get('max_value', 100))
+                distribution = dim.get('distribution', 'uniform')
+                
+                if distribution == 'uniform':
+                    # Uniform distribution between min and max
+                    if dimension_type == 'int':
+                        attributes[dimension_name] = random.randint(int(min_val), int(max_val))
+                    else:
+                        attributes[dimension_name] = random.uniform(min_val, max_val)
+                        
+                elif distribution == 'normal':
+                    # Normal distribution with mean at center of range and specified std_deviation
+                    mean = (min_val + max_val) / 2
+                    
+                    # Use spread_factor if available (new approach) or fall back to std_deviation (legacy)
+                    if 'spread_factor' in dim:
+                        # Convert spread factor to appropriate standard deviation based on range
+                        spread_factor = dim.get('spread_factor', 0.5)  # 0=concentrated, 1=spread
+                        std_dev = spread_factor * (max_val - min_val) / 6
+                    else:
+                        # Legacy behavior: use specified std_deviation or default
+                        std_dev = dim.get('std_deviation', (max_val - min_val) / 6)  # Default to range/6
+                    
+                    # Generate value and clip to min-max range
+                    value = random.normalvariate(mean, std_dev)
+                    value = max(min_val, min(max_val, value))
+                    
+                    if dimension_type == 'int':
+                        attributes[dimension_name] = int(round(value))
+                    else:
+                        attributes[dimension_name] = value
+                        
+                elif distribution == 'skewed':
+                    # Skewed distribution using exponential and adjusting with skew_factor
+                    skew_factor = dim.get('skew_factor', 0)  # -5 to 5, 0 is symmetric
+                    
+                    if skew_factor == 0:
+                        # No skew, use uniform
+                        if dimension_type == 'int':
+                            attributes[dimension_name] = random.randint(int(min_val), int(max_val))
+                        else:
+                            attributes[dimension_name] = random.uniform(min_val, max_val)
+                    else:
+                        # Generate a value from beta distribution and scale to range
+                        # Adjust alpha and beta parameters based on skew_factor
+                        if skew_factor < 0:  # Left skew
+                            alpha = 1 + abs(skew_factor)
+                            beta = 1.0
+                        else:  # Right skew
+                            alpha = 1.0
+                            beta = 1 + abs(skew_factor)
+                        
+                        # Generate value from beta distribution (0 to 1) and scale to range
+                        beta_value = random.betavariate(alpha, beta)
+                        scaled_value = min_val + beta_value * (max_val - min_val)
+                        
+                        if dimension_type == 'int':
+                            attributes[dimension_name] = int(round(scaled_value))
+                        else:
+                            attributes[dimension_name] = scaled_value
+            
+            # Handle legacy 'numerical' type for backward compatibility
             elif dimension_type == 'numerical':
                 # Generate a random number within the min-max range
                 min_val = float(dim.get('min_value', 0))
@@ -106,7 +188,7 @@ class EntityGenerator(dspy.Module):
                     attributes[dimension_name] = random.randint(int(min_val), int(max_val))
                 else:
                     attributes[dimension_name] = round(random.uniform(min_val, max_val), 2)
-                
+            
         return attributes
     
     @retry_on_error

@@ -71,6 +71,37 @@ const EntityTypeCreate = () => {
         return false;
       }
       
+      if (dim.type === 'int' || dim.type === 'float') {
+        if (dim.min_value === undefined || dim.max_value === undefined) {
+          setError(`Dimension "${dim.name}" needs min and max values`);
+          return false;
+        }
+        
+        if (dim.min_value >= dim.max_value) {
+          setError(`Dimension "${dim.name}" min value must be less than max value`);
+          return false;
+        }
+        
+        if (dim.distribution === 'normal') {
+          // Check for either spread_factor (new) or std_deviation (legacy)
+          if (dim.spread_factor !== undefined) {
+            if (dim.spread_factor <= 0 || dim.spread_factor > 1) {
+              setError(`Dimension "${dim.name}" spread factor must be between 0 and 1`);
+              return false;
+            }
+          } else if (dim.std_deviation !== undefined) {
+            if (dim.std_deviation <= 0) {
+              setError(`Dimension "${dim.name}" needs a positive standard deviation for normal distribution`);
+              return false;
+            }
+          } else {
+            setError(`Dimension "${dim.name}" needs a spread factor for normal distribution`);
+            return false;
+          }
+        }
+      }
+      
+      // Legacy validation for 'numerical' type
       if (dim.type === 'numerical') {
         if (dim.min_value === undefined || dim.max_value === undefined) {
           setError(`Dimension "${dim.name}" needs min and max values`);
@@ -80,6 +111,25 @@ const EntityTypeCreate = () => {
         if (dim.min_value >= dim.max_value) {
           setError(`Dimension "${dim.name}" min value must be less than max value`);
           return false;
+        }
+      }
+      
+      if (dim.type === 'boolean' && dim.true_percentage !== undefined) {
+        if (dim.true_percentage < 0 || dim.true_percentage > 1) {
+          setError(`Dimension "${dim.name}" true percentage must be between 0 and 1`);
+          return false;
+        }
+      }
+      
+      if (dim.type === 'categorical' && dim.distribution_values) {
+        const totalPercentage = Object.values(dim.distribution_values).reduce((sum, val) => sum + val, 0);
+        if (Math.abs(totalPercentage - 1) > 0.01) {
+          // Auto-normalize instead of showing error
+          const normalizedValues = {};
+          Object.keys(dim.distribution_values).forEach(key => {
+            normalizedValues[key] = dim.distribution_values[key] / totalPercentage;
+          });
+          dim.distribution_values = normalizedValues;
         }
       }
     }

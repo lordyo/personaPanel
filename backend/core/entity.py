@@ -4,7 +4,7 @@ Entity module for the Entity Simulation Framework.
 This module defines the core classes for entity types and instances.
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass
 
 
@@ -16,19 +16,30 @@ class Dimension:
     Attributes:
         name: The name of the dimension
         description: A description of what this dimension represents
-        type: The type of dimension (boolean, categorical, numerical, text)
+        type: The type of dimension (boolean, categorical, int, float, text)
         options: List of options for categorical dimensions
-        min_value: Minimum value for numerical dimensions
-        max_value: Maximum value for numerical dimensions
-        distribution: Distribution type for numerical dimensions (e.g., "uniform", "normal")
+        min_value: Minimum value for int/float dimensions
+        max_value: Maximum value for int/float dimensions
+        distribution: Distribution type for int/float dimensions (uniform, normal, skewed)
+                     or percentage for boolean
+        true_percentage: Percentage chance of true for boolean dimensions (default 0.5)
+        std_deviation: Standard deviation for normal distribution (legacy)
+        spread_factor: Controls the spread of values for normal distribution (0-1)
+        skew_factor: Skew factor for skewed distribution (-5 to 5)
+        distribution_values: Distribution percentages for categorical options
     """
     name: str
     description: str
-    type: str  # "boolean", "categorical", "numerical", "text"
+    type: str  # "boolean", "categorical", "int", "float", "text"
     options: Optional[List[str]] = None  # For categorical
-    min_value: Optional[float] = None  # For numerical
-    max_value: Optional[float] = None  # For numerical
-    distribution: Optional[str] = None  # For numerical
+    min_value: Optional[Union[int, float]] = None  # For int/float
+    max_value: Optional[Union[int, float]] = None  # For int/float
+    distribution: Optional[str] = None  # For int/float: "uniform", "normal", "skewed", For boolean: "percentage"
+    true_percentage: Optional[float] = None  # For boolean, default 0.5
+    std_deviation: Optional[float] = None  # For normal distribution (legacy)
+    spread_factor: Optional[float] = None  # For normal distribution (0-1, controls spread)
+    skew_factor: Optional[float] = None  # For skewed distribution
+    distribution_values: Optional[Dict[str, float]] = None  # For categorical
 
 
 @dataclass

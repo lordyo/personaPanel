@@ -47,10 +47,41 @@ def format_dimensions_description(dimensions):
         
         if dim['type'] == 'categorical' and 'options' in dim:
             desc += f"\n  Options: {', '.join(dim['options'])}"
-        elif dim['type'] == 'numerical':
-            desc += f"\n  Range: {dim.get('min_value', 'None')} to {dim.get('max_value', 'None')}"
+            if 'distribution_values' in dim:
+                desc += "\n  Option percentages: "
+                percentages = []
+                for option in dim['options']:
+                    if option in dim.get('distribution_values', {}):
+                        pct = dim['distribution_values'][option] * 100
+                        percentages.append(f"{option}: {pct:.1f}%")
+                desc += ", ".join(percentages)
+        
+        elif dim['type'] in ['int', 'float', 'numerical']:
+            if 'min_value' in dim and 'max_value' in dim:
+                desc += f"\n  Range: {dim.get('min_value', 'None')} to {dim.get('max_value', 'None')}"
+            
             if 'distribution' in dim:
                 desc += f", Distribution: {dim['distribution']}"
+                
+                if dim['distribution'] == 'normal':
+                    # Show spread_factor (new approach) or std_deviation (legacy)
+                    if 'spread_factor' in dim:
+                        spread_level = "narrow"
+                        if dim['spread_factor'] > 0.7:
+                            spread_level = "wide"
+                        elif dim['spread_factor'] > 0.3:
+                            spread_level = "medium"
+                        desc += f", Spread: {spread_level} ({dim['spread_factor']:.2f})"
+                    elif 'std_deviation' in dim:
+                        desc += f", Std Dev: {dim['std_deviation']}"
+                elif dim['distribution'] == 'skewed' and 'skew_factor' in dim:
+                    skew_dir = "right" if dim.get('skew_factor', 0) > 0 else "left"
+                    desc += f", Skewed {skew_dir} (factor: {dim.get('skew_factor', 0)})"
+        
+        elif dim['type'] == 'boolean' and 'true_percentage' in dim:
+            true_pct = dim['true_percentage'] * 100
+            false_pct = (1 - dim['true_percentage']) * 100
+            desc += f"\n  Distribution: True: {true_pct:.1f}%, False: {false_pct:.1f}%"
             
         descriptions.append(desc)
     
