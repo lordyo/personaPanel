@@ -1,0 +1,1 @@
+{"name": "Computer System Attributes", "attributes": "- Age: A numerical attribute representing the age of the system, ranging from 1 to 50 years.\n- Type: A categorical attribute that can be one of the following: Household, Combat, or Research."}

@@ -145,7 +145,7 @@ Entity Type: {entity_type}
 Dimensions: {dimensions}
 Variability Level: {variability}
 
-For each dimension, generate a value that:
+For each dimension, generate a CONCRETE VALUE that:
 1. Conforms to the dimension's type (boolean, categorical, numerical, or text)
 2. Stays within any constraints defined for the dimension
 3. Is realistic and coherent with the entity type
@@ -154,18 +154,24 @@ For each dimension, generate a value that:
 Rules:
 - Boolean dimensions should be either true or false
 - Categorical dimensions should be one of the provided options
-- Numerical dimensions should be within the specified range
+- Numerical dimensions should be a specific number within the specified range (not a description of a range)
 - Text dimensions should provide concise but meaningful content
 
+IMPORTANT: Do NOT provide descriptions of what the attributes should be. Instead, provide actual concrete values.
+For example:
+- Instead of "Age: Numerical (0-120 years)", provide "Age: 42"
+- Instead of "Gender: Categorical (Male, Female, Non-binary)", provide "Gender: Female"
+- Instead of "IsEmployed: Boolean", provide "IsEmployed: true"
+
 First, create a name for this entity that fits its type and nature.
-Then, for each dimension, provide a value that meets the criteria above.
+Then, for each dimension, provide a specific value that meets the criteria above.
 
 Your response should be structured as:
 
 name: [Entity Name]
 attributes:
-  [dimension1]: [value1]
-  [dimension2]: [value2]
+  [dimension1]: [specific_value1]
+  [dimension2]: [specific_value2]
   ...
 
 Ensure coherence across the values so they form a believable and consistent entity.

@@ -1,0 +1,10 @@
+{
+  "name": "Unnamed Entity",
+  "description": "No description available",
+  "attributes": {
+    "age": 193,
+    "race": "Human",
+    "hasMagic": false,
+    "magicType": "Arcane"
+  }
+}

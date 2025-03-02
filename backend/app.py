@@ -13,6 +13,8 @@ import traceback
 import logging
 from functools import wraps
 from dotenv import load_dotenv
+from logging.handlers import RotatingFileHandler
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,12 +26,52 @@ from llm.dspy_modules import EntityGenerator, SoloInteractionSimulator, DyadicIn
 import storage as storage
 from core.templates import get_template_names, get_template
 
-# Configure logging
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+
+# Configure root logger
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Configure app logger
 logger = logging.getLogger(__name__)
+
+# Add file handler for general logs
+general_handler = RotatingFileHandler(
+    'logs/app.log', 
+    maxBytes=10*1024*1024,  # 10MB
+    backupCount=5
+)
+general_handler.setFormatter(logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+))
+logger.addHandler(general_handler)
+
+# Add specific handler for API calls
+api_handler = RotatingFileHandler(
+    'logs/api_calls.log',
+    maxBytes=10*1024*1024,  # 10MB
+    backupCount=5
+)
+api_handler.setFormatter(logging.Formatter(
+    '%(asctime)s - %(levelname)s - %(message)s'
+))
+api_logger = logging.getLogger('api')
+api_logger.addHandler(api_handler)
+
+# Add specific handler for entity generation
+entity_handler = RotatingFileHandler(
+    'logs/entity_generation.log',
+    maxBytes=10*1024*1024,  # 10MB
+    backupCount=5
+)
+entity_handler.setFormatter(logging.Formatter(
+    '%(asctime)s - %(levelname)s - %(message)s'
+))
+entity_logger = logging.getLogger('entity')
+entity_logger.addHandler(entity_handler)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -98,28 +140,40 @@ def error_response(message, status_code=400):
 
 def handle_exceptions(f):
     """
-    Decorator to handle exceptions in route handlers.
+    Decorator to handle exceptions in routes.
     
     Args:
-        f: Function to decorate
+        f: The route handler function
         
     Returns:
-        Wrapped function with exception handling
+        Wrapped function that handles exceptions
     """
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def wrapped(*args, **kwargs):
         try:
+            # Log the API call
+            api_logger = logging.getLogger('api')
+            api_logger.info(f"API call: {request.method} {request.path}")
+            
+            # Only check for request.json on methods that typically have a request body
+            if request.method in ['POST', 'PUT', 'PATCH', 'DELETE'] and request.is_json:
+                api_logger.debug(f"Request data: {json.dumps(request.json)}")
+                
             return f(*args, **kwargs)
         except LLMError as e:
-            logger.error(f"LLM Error: {str(e)}")
-            return error_response(f"LLM Error: {str(e)}", 503)
+            logger.error(f"LLM Error: {e}")
+            api_logger.error(f"LLM Error in {request.path}: {e}")
+            return error_response(f"LLM error: {str(e)}", 500)
         except ValueError as e:
-            logger.error(f"Validation Error: {str(e)}")
+            logger.error(f"Validation Error: {e}")
+            api_logger.error(f"Validation Error in {request.path}: {e}")
             return error_response(str(e), 400)
         except Exception as e:
-            logger.error(f"Unexpected error: {str(e)}\n{traceback.format_exc()}")
-            return error_response("An unexpected error occurred", 500)
-    return decorated_function
+            logger.error(f"Unexpected error: {e}")
+            logger.error(traceback.format_exc())
+            api_logger.error(f"Unexpected error in {request.path}: {e}")
+            return error_response(f"Server error: {str(e)}", 500)
+    return wrapped
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -258,64 +312,126 @@ def create_entity():
     Request body:
         entity_type_id: ID of the entity type
         name: Name of the entity (when not generating)
+        description: Description of the entity (optional)
         attributes: Dictionary of attribute values (when not generating)
         generate: Boolean indicating whether to generate attributes using LLM (default: False)
-        variability: Variability level for generation (low, medium, high) (default: 'medium')
         count: Number of entities to generate (when generate is True, default: 1)
         
     Returns:
         JSON response with the created entity ID(s)
     """
-    data = request.json
+    data = request.get_json()
     
     # Validate required fields
     if not data or not data.get('entity_type_id'):
-        return error_response("Entity type ID is required")
+        return error_response("Entity type ID is required", 400)
     
     entity_type_id = data['entity_type_id']
     entity_type = storage.get_entity_type(entity_type_id)
-    
     if not entity_type:
-        return error_response(f"Entity type with ID {entity_type_id} not found", 404)
+        return error_response(f"Entity type {entity_type_id} not found", 404)
     
-    # Get count (for batch generation)
-    count = int(data.get('count', 1))
+    # Check if we should generate the entity
+    generate = data.get('generate', False)
+    count = data.get('count', 1)
     
     # Validate count
-    if count < 1 or count > 20:
-        return error_response("Count must be between 1 and 20")
+    try:
+        count = int(count)
+        if count < 1 or count > 100:
+            return error_response("Count must be between 1 and 100", 400)
+    except (ValueError, TypeError):
+        return error_response("Count must be a valid integer", 400)
     
-    # If 'generate' is true, use LLM to generate entity/entities
-    if data.get('generate', False):
-        if not lm:
-            return error_response("LLM is not configured", 503)
-        
-        variability = data.get('variability', 'medium')
-        if variability not in ['low', 'medium', 'high']:
-            return error_response("Variability must be 'low', 'medium', or 'high'")
-        
-        # For batch generation
-        entity_ids = []
-        
+    if generate:
+        # Use EntityGenerator to create entities
         try:
             generator = EntityGenerator()
+            entity_ids = []
             
-            # Generate specified number of entities
-            for i in range(count):
-                generated = generator.forward(
+            # Validate variability
+            variability_level = data.get('variability', 0.5)
+            try:
+                variability_level = float(variability_level)
+                if variability_level < 0 or variability_level > 1:
+                    return error_response("Variability must be between 0 and 1", 400)
+            except (ValueError, TypeError):
+                return error_response("Variability must be a valid number", 400)
+            
+            # Convert numeric variability to text variability level
+            if variability_level < 0.33:
+                variability = "low"
+            elif variability_level < 0.67:
+                variability = "medium"
+            else:
+                variability = "high"
+            
+            # Get entity type dimensions
+            dimensions = entity_type['dimensions']
+            
+            # Get entity type description if provided
+            entity_description = data.get('entity_description', '')
+            
+            # Process entities in parallel using ThreadPoolExecutor
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            # Function to generate a single entity
+            def generate_single_entity():
+                # Each call uses a fresh generator instance to avoid caching between entities
+                gen = EntityGenerator()
+                generated = gen.forward(
                     entity_type['name'],
-                    entity_type['dimensions'],
-                    variability
+                    dimensions,
+                    variability,
+                    entity_description
                 )
                 
-                name = generated['name']
-                attributes = generated['attributes']
+                logger.debug(f"Generated entity attributes: {generated['attributes']}")
+                logger.debug(f"Generated entity name: {generated['name']}")
                 
-                entity_id = storage.save_entity(entity_type_id, name, attributes)
-                entity_ids.append(entity_id)
+                # Log to entity generation logger
+                entity_logger = logging.getLogger('entity')
+                entity_logger.info(f"Generated entity: {generated['name']} for type {entity_type['name']}")
+                entity_logger.debug(f"Entity attributes: {generated['attributes']}")
+                
+                name = generated['name']
+                description = generated.get('description', '')
+                attributes = generated.get('attributes', {})
+                
+                # Save entity to database
+                entity_id = storage.save_entity(entity_type_id, name, description, attributes)
                 logger.info(f"Created generated entity: {name} (ID: {entity_id})")
+                entity_logger.info(f"Saved entity to database: {name} (ID: {entity_id})")
+                
+                return {
+                    "id": entity_id,
+                    "name": name,
+                    "type": entity_type['name'],
+                    "description": description,
+                    "attributes": attributes
+                }
             
-            return success_response({"ids": entity_ids}, 201)
+            # Use ThreadPoolExecutor for concurrent entity generation
+            entity_results = []
+            with ThreadPoolExecutor(max_workers=min(count, 10)) as executor:
+                # Submit all generation tasks
+                future_to_entity = {executor.submit(generate_single_entity): i for i in range(count)}
+                
+                # Process as they complete
+                for future in as_completed(future_to_entity):
+                    try:
+                        entity_result = future.result()
+                        entity_ids.append(entity_result["id"])
+                        entity_results.append(entity_result)
+                    except Exception as exc:
+                        logger.error(f"Entity generation task failed: {exc}")
+                        raise LLMError(f"Entity generation failed: {str(exc)}")
+            
+            # Return both IDs and the complete entity data
+            return success_response({
+                "ids": entity_ids,
+                "entities": entity_results
+            }, 201)
             
         except Exception as e:
             logger.error(f"Error in batch entity generation: {str(e)}")
@@ -323,15 +439,29 @@ def create_entity():
     else:
         # Use provided name and attributes (single entity only)
         name = data.get('name')
+        description = data.get('description', '')
+        # Ensure attributes is a dictionary
         attributes = data.get('attributes', {})
+        if isinstance(attributes, str):
+            try:
+                attributes = json.loads(attributes)
+            except:
+                logger.warning(f"Failed to parse attributes as JSON: {attributes}")
+                attributes = {}
         
         if not name:
-            return error_response("Name is required when not generating")
+            return error_response("Name is required when not generating", 400)
     
-        entity_id = storage.save_entity(entity_type_id, name, attributes)
+        entity_id = storage.save_entity(entity_type_id, name, description, attributes)
         logger.info(f"Created entity: {name} (ID: {entity_id})")
     
-        return success_response({"id": entity_id}, 201)
+        return success_response({
+            "id": entity_id,
+            "name": name,
+            "type": entity_type['name'],
+            "description": description,
+            "attributes": attributes
+        }, 201)
 
 @app.route('/api/entities/<entity_id>', methods=['GET'])
 @handle_exceptions

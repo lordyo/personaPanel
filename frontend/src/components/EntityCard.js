@@ -17,17 +17,23 @@ const EntityCard = ({ entity, isSelected, onSelect, onEdit, onDelete }) => {
     if (entity && entity.id) {
       console.log(`Entity ${entity.id} data:`, entity);
       console.log(`Entity ${entity.id} attributes:`, entity.attributes);
+    } else if (entity) {
+      console.warn("Entity missing ID:", entity);
     }
   }, [entity]);
 
+  // Return null if entity is undefined or missing critical properties
+  if (!entity || !entity.id) {
+    console.error("Received invalid entity data:", entity);
+    return null;
+  }
+
   // Get a few key attributes to display in the card
   const getDisplayAttributes = () => {
-    if (!entity || !entity.attributes) {
+    if (!entity.attributes) {
       return [];
     }
 
-    console.log('Attributes type:', typeof entity.attributes);
-    
     // Make sure we're working with an object
     const attributes = entity.attributes;
     if (typeof attributes !== 'object') {
@@ -39,7 +45,7 @@ const EntityCard = ({ entity, isSelected, onSelect, onEdit, onDelete }) => {
     return Object.entries(attributes)
       .slice(0, 3)
       .map(([key, value]) => (
-        <div key={key} className="text-sm">
+        <div key={`${entity.id}-${key}`} className="text-sm">
           <span className="font-medium text-gray-400">{key}: </span>
           <span className="text-gray-300">
             {typeof value === 'object' ? JSON.stringify(value) : String(value)}
@@ -50,7 +56,7 @@ const EntityCard = ({ entity, isSelected, onSelect, onEdit, onDelete }) => {
   
   // Count actual attributes
   const getAttributeCount = () => {
-    if (!entity || !entity.attributes) {
+    if (!entity.attributes) {
       return 0;
     }
     
@@ -65,7 +71,7 @@ const EntityCard = ({ entity, isSelected, onSelect, onEdit, onDelete }) => {
       onClick={() => onSelect(entity.id)}
     >
       <div className="flex justify-between items-start">
-        <h3 className="text-lg font-semibold text-blue-300">{entity.name}</h3>
+        <h3 className="text-lg font-semibold text-blue-300">{entity.name || 'Unnamed Entity'}</h3>
         <div className="flex space-x-2">
           <button 
             className="text-blue-400 hover:text-blue-300 text-sm"
@@ -88,7 +94,13 @@ const EntityCard = ({ entity, isSelected, onSelect, onEdit, onDelete }) => {
         </div>
       </div>
       
-      <p className="text-gray-300 text-sm mb-2">Type: {entity.entity_type_name}</p>
+      <p className="text-gray-300 text-sm mb-2">Type: {entity.entity_type_name || 'Unknown Type'}</p>
+      
+      {entity.description && (
+        <p className="text-gray-400 text-sm mb-2 line-clamp-2 overflow-hidden">
+          {entity.description.substring(0, 150)}{entity.description.length > 150 ? '...' : ''}
+        </p>
+      )}
       
       <div className="mt-2 space-y-1">
         {getDisplayAttributes()}

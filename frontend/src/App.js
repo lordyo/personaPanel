@@ -99,7 +99,7 @@ const Home = () => (
       Entity Simulation Framework
     </h1>
     <h2 className="text-xl text-gray-300 mb-8">
-      Welcome to the Entity Simulation Framework, an LLM-powered system for simulating interactions between diverse virtual entities.
+      Simulate interactions between diverse virtual entities.
     </h2>
     
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

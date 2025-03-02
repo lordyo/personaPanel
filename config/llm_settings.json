@@ -1,0 +1,9 @@
+{
+  "model_settings": {
+    "model": "gpt-4o",
+    "temperature": 1.2,
+    "cache": false,
+    "cache_in_memory": false,
+    "max_tokens": 1000
+  }
+} 

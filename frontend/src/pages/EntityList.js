@@ -4,6 +4,7 @@ import api from '../services/api';
 import EntityCard from '../components/EntityCard';
 import EntityForm from '../components/EntityForm';
 import EntityGenerationForm from '../components/EntityGenerationForm';
+import EntityDetail from '../components/EntityDetail';
 import LoadingIndicator from '../components/LoadingIndicator';
 
 /**
@@ -16,6 +17,7 @@ const EntityList = () => {
   const [entities, setEntities] = useState([]);
   const [filteredEntities, setFilteredEntities] = useState([]);
   const [selectedEntityIds, setSelectedEntityIds] = useState([]);
+  const [viewingEntity, setViewingEntity] = useState(null);
   const [editingEntity, setEditingEntity] = useState(null);
   const [editingEntityType, setEditingEntityType] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -32,15 +34,19 @@ const EntityList = () => {
       try {
         setLoading(true);
         const typesResponse = await api.getEntityTypes();
-        setEntityTypes(typesResponse.data);
+        // Handle both response formats
+        const types = typesResponse.data || typesResponse;
+        setEntityTypes(Array.isArray(types) ? types : []);
         
         // Fetch all entities 
-        const entitiesPromises = typesResponse.data.map(type => 
+        const entitiesPromises = (typesResponse.data || typesResponse).map(type => 
           api.getEntitiesByType(type.id)
         );
         
         const entitiesResponses = await Promise.all(entitiesPromises);
-        const allEntities = entitiesResponses.flatMap(response => response.data);
+        const allEntities = entitiesResponses.flatMap(response => 
+          response.data || response || []
+        );
         
         setEntities(allEntities);
         setFilteredEntities(allEntities);
@@ -57,13 +63,14 @@ const EntityList = () => {
   
   // Filter entities when search term or filter type changes
   useEffect(() => {
-    let filtered = [...entities];
+    // Filter out invalid entities first (those without ID or critical properties)
+    let filtered = entities.filter(entity => entity && entity.id);
     
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(entity => 
-        entity.name.toLowerCase().includes(term) || 
-        entity.entity_type_name.toLowerCase().includes(term)
+        (entity.name && entity.name.toLowerCase().includes(term)) || 
+        (entity.entity_type_name && entity.entity_type_name.toLowerCase().includes(term))
       );
     }
     
@@ -75,6 +82,12 @@ const EntityList = () => {
   }, [entities, searchTerm, filterTypeId]);
   
   const handleSelectEntity = (entityId) => {
+    // Find the entity in our list
+    const entity = entities.find(e => e.id === entityId);
+    if (entity) {
+      setViewingEntity(entity);
+    }
+    
     setSelectedEntityIds(prev => {
       if (prev.includes(entityId)) {
         return prev.filter(id => id !== entityId);
@@ -144,23 +157,49 @@ const EntityList = () => {
       const response = await api.generateEntities(
         formData.entityTypeId,
         formData.count,
-        formData.variability
+        formData.variability,
+        formData.entityDescription
       );
       
       if (response.status === 'success') {
-        // Refresh the entities list
-        const entityType = entityTypes.find(et => et.id === formData.entityTypeId);
-        const newEntitiesResponse = await api.getEntitiesByType(formData.entityTypeId);
-        
-        // Add or replace entities of this type in our state
-        setEntities(prev => {
-          // Filter out entities of the same type
-          const otherEntities = prev.filter(e => e.entity_type_id !== formData.entityTypeId);
-          // Add the new entities
-          return [...otherEntities, ...newEntitiesResponse.data];
-        });
+        // Check if the response has entities directly in it
+        if (response.data && response.data.entities && Array.isArray(response.data.entities)) {
+          // Use the entities directly from the response
+          const newEntities = response.data.entities;
+          
+          // Add entity_type_name to each entity for display purposes
+          const entityType = entityTypes.find(et => et.id === formData.entityTypeId);
+          const processedEntities = newEntities.map(entity => ({
+            ...entity,
+            entity_type_id: formData.entityTypeId,
+            entity_type_name: entityType?.name || 'Unknown Type'
+          }));
+          
+          // Update the entities state
+          setEntities(prev => {
+            // Filter out any entities of this type that might have the same ID
+            // This ensures we don't have duplicates
+            const filteredEntities = prev.filter(e => 
+              !processedEntities.some(newEntity => newEntity.id === e.id)
+            );
+            return [...filteredEntities, ...processedEntities];
+          });
+        } else {
+          // Fallback to the old way - fetch entities again
+          const entityType = entityTypes.find(et => et.id === formData.entityTypeId);
+          const newEntitiesResponse = await api.getEntitiesByType(formData.entityTypeId);
+          
+          // Add or replace entities of this type in our state
+          setEntities(prev => {
+            // Filter out entities of the same type
+            const otherEntities = prev.filter(e => e.entity_type_id !== formData.entityTypeId);
+            // Add the new entities - check if response has data property or is the data itself
+            const newEntities = newEntitiesResponse.data || newEntitiesResponse;
+            return [...otherEntities, ...(Array.isArray(newEntities) ? newEntities : [])];
+          });
+        }
       } else {
-        setError('Failed to generate entities: ' + response.message);
+        setError('Failed to generate entities: ' + (response.message || 'Unknown error'));
       }
     } catch (err) {
       setError('Failed to generate entities. Please try again.');
@@ -176,6 +215,11 @@ const EntityList = () => {
   };
   
   const handleDeleteEntity = async (entityId) => {
+    if (!entityId) {
+      console.error("Attempted to delete entity with undefined ID");
+      return;
+    }
+    
     // Find the entity to show its name in the confirmation
     const entityToDelete = entities.find(e => e.id === entityId);
     if (!entityToDelete) return;
@@ -183,7 +227,7 @@ const EntityList = () => {
     // Set up confirmation dialog
     setDeleteConfirmation({
       id: entityId,
-      name: entityToDelete.name,
+      name: entityToDelete.name || 'Unnamed Entity',
       isAll: false
     });
   };
@@ -349,16 +393,18 @@ const EntityList = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredEntities.map(entity => (
-                  <EntityCard 
-                    key={entity.id}
-                    entity={entity}
-                    isSelected={selectedEntityIds.includes(entity.id)}
-                    onSelect={handleSelectEntity}
-                    onEdit={handleEditEntity}
-                    onDelete={handleDeleteEntity}
-                  />
-                ))}
+                {filteredEntities
+                  .filter(entity => entity && entity.id) // Extra validation filter
+                  .map(entity => (
+                    <EntityCard 
+                      key={entity.id}
+                      entity={entity}
+                      isSelected={selectedEntityIds.includes(entity.id)}
+                      onSelect={handleSelectEntity}
+                      onEdit={handleEditEntity}
+                      onDelete={handleDeleteEntity}
+                    />
+                  ))}
               </div>
             )}
           </div>
@@ -438,6 +484,14 @@ const EntityList = () => {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Detail Modal */}
+      {viewingEntity && (
+        <EntityDetail 
+          entity={viewingEntity} 
+          onClose={() => setViewingEntity(null)}
+        />
       )}
     </div>
   );

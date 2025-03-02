@@ -223,7 +223,17 @@ const entityApi = {
    * @param {string} entityTypeId - The entity type id
    * @returns {Promise} - List of entities
    */
-  getByType: (entityTypeId) => get(`/entity-types/${entityTypeId}/entities`),
+  getByType: async (entityTypeId) => {
+    try {
+      const result = await get(`/entity-types/${entityTypeId}/entities`);
+      return result;
+    } catch (error) {
+      console.warn(`Error fetching entities for type ${entityTypeId}:`, error);
+      // For corrupted entity types, return an empty array instead of propagating the error
+      // This prevents the UI from breaking when a specific entity type has data issues
+      return [];
+    }
+  },
   
   /**
    * Create a new entity.
@@ -238,27 +248,17 @@ const entityApi = {
    * 
    * @param {string} entityTypeId - The entity type id
    * @param {number} count - Number of entities to generate (1-20)
-   * @param {string|number} variability - Variability level (low, medium, high) or number (0-1)
+   * @param {number} variability - Variability level (0-1)
+   * @param {string} entityDescription - Optional description to guide entity generation
    * @returns {Promise} - The generated entities
    */
-  generate: (entityTypeId, count, variability) => {
-    // Convert numeric variability to string (if it's a number)
-    let variabilityLevel = variability;
-    if (typeof variability === 'number') {
-      if (variability < 0.33) {
-        variabilityLevel = 'low';
-      } else if (variability < 0.67) {
-        variabilityLevel = 'medium';
-      } else {
-        variabilityLevel = 'high';
-      }
-    }
-    
+  generateEntities: (entityTypeId, count = 1, variability = 0.5, entityDescription = '') => {
     return post('/entities', {
       entity_type_id: entityTypeId,
+      generate: true,
       count: count,
-      variability: variabilityLevel,
-      generate: true
+      variability: variability,
+      entity_description: entityDescription
     });
   },
   
@@ -359,7 +359,7 @@ const api = {
   getEntitiesByType: entityApi.getByType,
   createEntity: entityApi.create,
   updateEntity: entityApi.update,
-  generateEntities: entityApi.generate,
+  generateEntities: entityApi.generateEntities,
   deleteEntity: entityApi.delete,
   deleteEntitiesByType: entityApi.deleteByType,
   

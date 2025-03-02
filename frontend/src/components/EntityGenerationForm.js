@@ -10,6 +10,7 @@ import React, { useState, useEffect } from 'react';
  */
 const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
   const [entityTypeId, setEntityTypeId] = useState('');
+  const [entityDescription, setEntityDescription] = useState('');
   const [count, setCount] = useState(1);
   const [variability, setVariability] = useState(0.5);
   const [error, setError] = useState('');
@@ -42,6 +43,7 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
     setError('');
     onGenerate({
       entityTypeId,
+      entityDescription,
       count,
       variability
     });
@@ -72,6 +74,22 @@ const EntityGenerationForm = ({ entityTypes, onGenerate }) => {
             </option>
           ))}
         </select>
+      </div>
+      
+      <div className="mb-4">
+        <label className="block text-gray-400 text-sm font-medium mb-2" htmlFor="entityDescription">
+          Entity Description (Optional)
+        </label>
+        <textarea
+          id="entityDescription"
+          placeholder="Describe this entity to guide generation (optional)"
+          value={entityDescription}
+          onChange={(e) => setEntityDescription(e.target.value)}
+          className="w-full bg-gray-750 border border-gray-700 rounded p-2 text-gray-300 focus:outline-none focus:border-blue-500 min-h-[80px]"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          A brief description of the entity to guide generation. Leave empty for fully automated generation.
+        </p>
       </div>
       
       <div className="mb-4">

@@ -1,0 +1,1 @@
+{"name": "Chief Executive Officers", "attributes": {"Age": "Numerical, ranging from 0 to 120 years, with a normal distribution.", "Gender": "Categorical, with options including Male, Female, Non-binary, and Other.", "Employment Status": "Boolean, indicating whether the individual is currently employed."}, "description": ""}

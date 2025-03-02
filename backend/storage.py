@@ -11,6 +11,7 @@ import uuid
 import os
 from typing import Dict, List, Any, Optional, Tuple
 import datetime
+import logging
 
 # Database file path
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'entity_sim.db')
@@ -50,6 +51,7 @@ def init_db():
         name TEXT NOT NULL,
         attributes TEXT NOT NULL,  -- JSON string
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        description TEXT NOT NULL,
         FOREIGN KEY (entity_type_id) REFERENCES entity_types (id)
     )
     ''')
@@ -222,13 +224,14 @@ def update_entity_type(entity_type_id: str, name: str, description: str, dimensi
 
 # Entity Functions
 
-def save_entity(entity_type_id: str, name: str, attributes: Dict[str, Any]) -> str:
+def save_entity(entity_type_id: str, name: str, description: str, attributes: Dict[str, Any]) -> str:
     """
     Save an entity instance to the database.
     
     Args:
         entity_type_id: ID of the entity type
         name: Name of the entity
+        description: Description of the entity
         attributes: Dictionary of attribute values
         
     Returns:
@@ -238,13 +241,24 @@ def save_entity(entity_type_id: str, name: str, attributes: Dict[str, Any]) -> s
     cursor = conn.cursor()
     
     entity_id = str(uuid.uuid4())
+    
+    # Correct field order to match actual database schema:
+    # id, entity_type_id, name, attributes, created_at, description
     cursor.execute(
-        'INSERT INTO entities VALUES (?, ?, ?, ?, ?)',
-        (entity_id, entity_type_id, name, json.dumps(attributes), datetime.datetime.now().isoformat())
+        'INSERT INTO entities VALUES (?, ?, ?, ?, ?, ?)',
+        (
+            entity_id, 
+            entity_type_id, 
+            name, 
+            json.dumps(attributes),  # Attributes is 4th column
+            datetime.datetime.now().isoformat(),  # created_at is 5th column
+            description  # Description is 6th column
+        )
     )
     
     conn.commit()
     conn.close()
+    
     return entity_id
 
 
@@ -258,6 +272,8 @@ def get_entity(entity_id: str) -> Optional[Dict[str, Any]]:
     Returns:
         Entity dictionary or None if not found
     """
+    logger = logging.getLogger('app')
+    
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -269,13 +285,29 @@ def get_entity(entity_id: str) -> Optional[Dict[str, Any]]:
     if row is None:
         return None
     
-    return {
-        'id': row[0],
-        'entity_type_id': row[1],
-        'name': row[2],
-        'attributes': json.loads(row[3]),
-        'created_at': row[4]
-    }
+    try:
+        # The correct column order in the database is:
+        # id(0), entity_type_id(1), name(2), attributes(3), created_at(4), description(5)
+        attributes = json.loads(row[3])
+        return {
+            'id': row[0],
+            'entity_type_id': row[1],
+            'name': row[2],
+            'attributes': attributes,
+            'created_at': row[4],
+            'description': row[5]
+        }
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse attributes for entity {entity_id}: {e}")
+        # Return entity with empty attributes instead of failing
+        return {
+            'id': row[0],
+            'entity_type_id': row[1],
+            'name': row[2],
+            'attributes': {},
+            'created_at': row[4],
+            'description': row[5]
+        }
 
 
 def get_entities_by_type(entity_type_id: str) -> List[Dict[str, Any]]:
@@ -288,6 +320,8 @@ def get_entities_by_type(entity_type_id: str) -> List[Dict[str, Any]]:
     Returns:
         List of entity dictionaries
     """
+    logger = logging.getLogger('app')
+    
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -298,13 +332,22 @@ def get_entities_by_type(entity_type_id: str) -> List[Dict[str, Any]]:
     
     entities = []
     for row in rows:
-        entities.append({
-            'id': row[0],
-            'entity_type_id': row[1],
-            'name': row[2],
-            'attributes': json.loads(row[3]),
-            'created_at': row[4]
-        })
+        try:
+            # The correct column order in the database is:
+            # id(0), entity_type_id(1), name(2), attributes(3), created_at(4), description(5)
+            attributes = json.loads(row[3])
+            entities.append({
+                'id': row[0],
+                'entity_type_id': row[1],
+                'name': row[2],
+                'attributes': attributes,
+                'created_at': row[4],
+                'description': row[5]
+            })
+        except json.JSONDecodeError as e:
+            # Log the error but skip this entity
+            logger.error(f"Failed to parse attributes for entity {row[0]}, skipping: {e}")
+            continue
     
     return entities
 

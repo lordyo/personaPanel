@@ -1,0 +1,98 @@
+{
+  "num_entities": 1,
+  "entity_inputs": [
+    {
+      "name": "Human",
+      "entity_type": "Human",
+      "entity_description": "A realistic human being with a unique personality and background",
+      "variability": 0.7,
+      "dimensions": [
+        {
+          "name": "nationality",
+          "description": "The country of origin for this person",
+          "type": "categorical",
+          "options": ["American", "British", "Chinese", "Indian", "Brazilian", "Nigerian", "Australian", "German", "Japanese"]
+        },
+        {
+          "name": "hobby",
+          "description": "This person's favorite hobby or pastime",
+          "type": "categorical",
+          "options": ["Reading", "Hiking", "Gaming", "Cooking", "Painting", "Music", "Gardening", "Sports", "Travel", "Photography"]
+        },
+        {
+          "name": "age",
+          "description": "The age of this person in years",
+          "type": "numerical",
+          "min_value": 18,
+          "max_value": 90
+        },
+        {
+          "name": "is_employed",
+          "description": "Whether this person currently has a job",
+          "type": "boolean"
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "personality",
+          "description": "The key personality traits that define this person's character"
+        },
+        {
+          "name": "pet",
+          "description": "This person's pet, if they have one (including type, name, and brief description)"
+        },
+        {
+          "name": "favorite_quote",
+          "description": "A quote or saying that this person lives by or often repeats"
+        }
+      ]
+    },
+    {
+      "name": "Fantasy Character",
+      "entity_type": "Fantasy Character",
+      "entity_description": "A fictional character from a fantasy world",
+      "variability": 0.9,
+      "dimensions": [
+        {
+          "name": "race",
+          "description": "The fantasy species or race of this character",
+          "type": "categorical",
+          "options": ["Human", "Elf", "Dwarf", "Orc", "Halfling", "Gnome", "Dragon-born", "Fairy", "Undead"]
+        },
+        {
+          "name": "class",
+          "description": "The character's profession or class",
+          "type": "categorical",
+          "options": ["Warrior", "Mage", "Rogue", "Cleric", "Bard", "Ranger", "Paladin", "Necromancer", "Alchemist"]
+        },
+        {
+          "name": "age",
+          "description": "The age of this character in years",
+          "type": "numerical",
+          "min_value": 15,
+          "max_value": 1000
+        },
+        {
+          "name": "is_magical",
+          "description": "Whether this character can use magic",
+          "type": "boolean"
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "abilities",
+          "description": "Special abilities, powers, or skills this character possesses"
+        },
+        {
+          "name": "weapon",
+          "description": "The character's primary weapon or magical implement"
+        },
+        {
+          "name": "quest",
+          "description": "The current quest or mission this character is pursuing"
+        }
+      ]
+    }
+  ],
+  "default_entity": "Human"
+} 
