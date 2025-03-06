@@ -1,8 +1,25 @@
 #!/bin/bash
 # Script to run the Entity Simulation Framework
 
+# Parse command line arguments
+DEBUG_MODE=false
+for arg in "$@"; do
+  case $arg in
+    --debug)
+      DEBUG_MODE=true
+      shift
+      ;;
+    *)
+      # Unknown option
+      ;;
+  esac
+done
+
 # Display welcome message
 echo "Starting Entity Simulation Framework..."
+if [ "$DEBUG_MODE" = true ]; then
+  echo "Running in DEBUG mode - backend will run in foreground with visible output"
+fi
 
 # Go to the project root directory
 cd "$(dirname "$0")"
@@ -36,24 +53,61 @@ if [ ! -d "backend/venv" ]; then
   cd ..
 fi
 
-# Run the server in the background
+# Run the server
 cd backend
 source venv/bin/activate
-python3 scripts/run_server.py > ../backend.log 2>&1 &
-BACKEND_PID=$!
-echo "Backend server started with PID: $BACKEND_PID"
+# Set the port to 5000 to match what the frontend proxy expects
+export PORT=5000
+echo "Backend will run on port 5000"
+
+# Check if we're in debug mode
+if [ "$DEBUG_MODE" = true ]; then
+  # In debug mode, run the backend in the foreground in a separate terminal
+  echo "Running backend in debug mode (foreground)..."
+  
+  # Function to check if a command exists
+  command_exists() {
+    command -v "$1" &> /dev/null
+  }
+  
+  # Try different terminal emulators
+  if command_exists gnome-terminal; then
+    gnome-terminal --title="Backend Server" -- bash -c "source venv/bin/activate && python3 scripts/run_server.py; read -p 'Press Enter to close...'"
+  elif command_exists xterm; then
+    xterm -title "Backend Server" -e "source venv/bin/activate && python3 scripts/run_server.py; read -p 'Press Enter to close...'"
+  elif command_exists konsole; then
+    konsole --new-tab -p tabtitle="Backend Server" -e bash -c "source venv/bin/activate && python3 scripts/run_server.py; read -p 'Press Enter to close...'"
+  elif command_exists terminal; then
+    terminal -e "source venv/bin/activate && python3 scripts/run_server.py; read -p 'Press Enter to close...'"
+  else
+    echo "No terminal emulator found. Running backend in current terminal..."
+    echo "Press Ctrl+C to stop the backend when you're done."
+    source venv/bin/activate && python3 scripts/run_server.py
+    # If we get here, the backend has stopped, so exit the script
+    exit 0
+  fi
+  
+  # Give it a moment to start up
+  sleep 2
+else
+  # In normal mode, run the backend in the background
+  python3 scripts/run_server.py > ../backend.log 2>&1 &
+  BACKEND_PID=$!
+  echo "Backend server started with PID: $BACKEND_PID"
+fi
+
 cd ..
 
 # Check if frontend dev server is already running
-if lsof -i :3000 > /dev/null; then
+if lsof -i :5001 > /dev/null; then
   echo "Killing existing frontend development server..."
-  kill $(lsof -t -i:3000) 2>/dev/null || true
+  kill $(lsof -t -i:5001) 2>/dev/null || true
   sleep 1
   
   # Force kill if still running
-  if lsof -i :3000 > /dev/null; then
+  if lsof -i :5001 > /dev/null; then
     echo "Forcefully terminating frontend server..."
-    kill -9 $(lsof -t -i:3000) 2>/dev/null || true
+    kill -9 $(lsof -t -i:5001) 2>/dev/null || true
     sleep 1
   fi
   
@@ -70,11 +124,13 @@ if [ ! -d "node_modules" ]; then
   npm install
 fi
 
-# Start the development server
-echo "Starting React development server..."
-npm start
+# Start the development server on port 5001
+echo "Starting React development server on port 5001..."
+PORT=5001 npm start
 
-# When the user stops the React app, also stop the backend
-trap "kill $BACKEND_PID 2>/dev/null" EXIT
+# When the user stops the React app, also stop the backend if it's running in background
+if [ "$DEBUG_MODE" = false ] && [ -n "$BACKEND_PID" ]; then
+  trap "kill $BACKEND_PID 2>/dev/null" EXIT
+fi
 
 echo "Application stopped." 

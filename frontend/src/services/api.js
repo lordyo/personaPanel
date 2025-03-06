@@ -3,7 +3,8 @@
  * Contains functions for making requests to the API endpoints.
  */
 
-const API_URL = 'http://localhost:5001/api';
+// Use relative URL to work with the proxy configuration in package.json
+const API_URL = '/api';
 
 /**
  * Make a GET request to the specified endpoint.
@@ -24,6 +25,14 @@ async function get(endpoint) {
     });
     
     if (!response.ok) {
+      console.error(`API error for ${endpoint}: Status ${response.status}`);
+      let errorText = '';
+      try {
+        errorText = await response.text();
+        console.error(`Response body: ${errorText}`);
+      } catch (e) {
+        console.error(`Could not read response text: ${e.message}`);
+      }
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     
@@ -36,13 +45,14 @@ async function get(endpoint) {
     try {
       const data = JSON.parse(text);
       return data;
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
+    } catch (e) {
+      console.error(`JSON parse error for ${endpoint}:`, e);
+      console.error(`Response text: ${text.substring(0, 200)}...`);
       return { status: 'error', message: 'Invalid JSON response from server' };
     }
   } catch (error) {
     console.error(`Error fetching from ${endpoint}:`, error);
-    return { status: 'error', message: error.message || 'Unknown error occurred' };
+    throw error;
   }
 }
 

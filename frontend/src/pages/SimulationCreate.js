@@ -26,12 +26,23 @@ const SimulationCreate = () => {
   useEffect(() => {
     const fetchEntityTypes = async () => {
       try {
-        const data = await entityTypeApi.getAll();
-        setEntityTypes(data);
+        console.log("Fetching entity types...");
+        const response = await entityTypeApi.getAll();
+        console.log("Entity types response:", response);
+        
+        if (response && response.status === 'success') {
+          setEntityTypes(response.data || []);
+          setError(null);
+        } else {
+          console.error('Error fetching entity types:', response?.message || 'Unknown error');
+          setError(`Failed to load entity types: ${response?.message || 'Unknown error'}`);
+          setEntityTypes([]);
+        }
         setLoading(false);
       } catch (err) {
         console.error("Error fetching entity types:", err);
-        setError("Failed to load entity types. Please try again later.");
+        setError(`Failed to load entity types: ${err.message || 'Please try again later.'}`);
+        setEntityTypes([]);
         setLoading(false);
       }
     };
@@ -239,11 +250,15 @@ const SimulationCreate = () => {
                   },
                 }}
               >
-                {entityTypes.map((type) => (
-                  <MenuItem key={type.id} value={type.id}>
-                    {type.name}
-                  </MenuItem>
-                ))}
+                {Array.isArray(entityTypes) ? (
+                  entityTypes.map((type) => (
+                    <MenuItem key={type.id} value={type.id}>
+                      {type.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>No entity types available</MenuItem>
+                )}
               </Select>
             </FormControl>
             

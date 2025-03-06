@@ -15,6 +15,7 @@ from functools import wraps
 from dotenv import load_dotenv
 from logging.handlers import RotatingFileHandler
 import json
+import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -76,8 +77,8 @@ entity_logger.addHandler(entity_handler)
 # Initialize Flask app
 app = Flask(__name__)
 
-# Configure CORS properly - important for cross-origin requests
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# Configure CORS to allow cross-origin requests from the frontend
+CORS(app, supports_credentials=True)
 
 # Initialize database
 @app.before_first_request
@@ -902,6 +903,14 @@ def delete_entities_by_type(entity_type_id):
     logger.info(f"Deleted {count} entities of type: {entity_type_id}")
     
     return success_response({"count": count})
+
+@app.route('/test', methods=['GET'])
+def test_endpoint():
+    """Test endpoint to verify the Flask app is running correctly."""
+    return success_response({
+        "message": "API is functioning correctly!",
+        "time": datetime.datetime.now().isoformat()
+    })
 
 if __name__ == '__main__':
     # Use environment variable for port or default to 5001 (avoiding common 5000 port)

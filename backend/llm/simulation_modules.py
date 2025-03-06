@@ -112,7 +112,7 @@ class DyadicInteractionSignature(dspy.Signature):
     )
     
     content: str = dspy.OutputField(
-        desc="Dialogue between the two entities across multiple rounds. For each round, include inner thoughts and spoken dialogue. Format: ROUND [last_round_number+1]\n[entity1_name]: *[inner thoughts]*\n'[spoken dialogue]'\n[entity2_name]: *[inner thoughts]*\n'[spoken dialogue]'\n\nROUND [last_round_number+2]\n... Continue with all requested rounds, each clearly labeled with round number."
+        desc="Dialogue between the two entities across multiple rounds. For each round, include inner thoughts and spoken dialogue. Format: ROUND [last_round_number+1]\n[entity1_name]: (thinks) *[inner thoughts]*\n'[spoken dialogue]'\n[entity2_name]: (thinks) *[inner thoughts]*\n'[spoken dialogue]'\n\nROUND [last_round_number+2]\n... Continue with all requested rounds, each clearly labeled with round number."
     )
     final_round_number: int = dspy.OutputField(
         desc="The number of the last round generated in this response. This will be used as last_round_number in subsequent calls."
@@ -139,7 +139,7 @@ class GroupInteractionSignature(dspy.Signature):
     )
     
     content: str = dspy.OutputField(
-        desc="Group conversation across multiple rounds. For each round, include inner thoughts and spoken dialogue for each entity. Format: ROUND [last_round_number+1]\n[entity1_name]: *[inner thoughts]*\n'[spoken dialogue]'\n[entity2_name]: *[inner thoughts]*\n'[spoken dialogue]'\n...\n\nROUND [last_round_number+2]\n... Continue with all requested rounds, each clearly labeled with round number."
+        desc="Group conversation across multiple rounds. For each round, include inner thoughts and spoken dialogue for each entity. Format: ROUND [last_round_number+1]\n[entity1_name]: (thinks) *[inner thoughts]*\n'[spoken dialogue]'\n[entity2_name]: (thinks) *[inner thoughts]*\n'[spoken dialogue]'\n...\n\nROUND [last_round_number+2]\n... Continue with all requested rounds, each clearly labeled with round number."
     )
     final_round_number: int = dspy.OutputField(
         desc="The number of the last round generated in this response. This will be used as last_round_number in subsequent calls."

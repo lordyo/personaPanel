@@ -140,11 +140,17 @@ def run_simulation_from_config(config, entities, output_dir):
     # Get previous interaction if provided
     previous_interaction = config.get('previous_interaction')
     
+    # Get number of rounds and last round number if provided
+    n_rounds = config.get('n_rounds', 1)
+    last_round_number = config.get('last_round_number', 0)
+    
     # Run simulation
     result = engine.run_simulation(
         context=context,
         entities=simulation_entities,
         interaction_type=interaction_type,
+        n_rounds=n_rounds,
+        last_round_number=last_round_number,
         previous_interaction=previous_interaction
     )
     
