@@ -23,9 +23,10 @@ load_dotenv()
 # Import modules
 from core.entity import EntityType, EntityInstance, Dimension
 from core.simulation import SimulationEngine, Context, InteractionType
-from llm.dspy_modules import EntityGenerator, SoloInteractionSimulator, DyadicInteractionSimulator, GroupInteractionSimulator, LLMError
+from llm.dspy_modules import EntityGenerator
 import storage as storage
 from core.templates import get_template_names, get_template
+from llm.simulation_modules import SoloInteractionSimulator, DyadicInteractionSimulator, GroupInteractionSimulator, LLMError
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -652,6 +653,9 @@ def create_simulation():
         interaction_type: Type of interaction (solo, dyadic, group)
         entity_ids: List of entity IDs to include in simulation
         metadata: Optional metadata
+        n_rounds: Number of rounds to simulate (default: 1)
+        last_round_number: Number of the last round (for continuations)
+        previous_interaction: Previous interaction (for continuations)
         
     Returns:
         JSON response with the simulation ID and result
@@ -666,6 +670,9 @@ def create_simulation():
     interaction_type = data['interaction_type']
     entity_ids = data['entity_ids']
     metadata = data.get('metadata', {})
+    n_rounds = data.get('n_rounds', 1)  # Default to 1 round if not specified
+    last_round_number = data.get('last_round_number', 0)  # For continuations
+    previous_interaction = data.get('previous_interaction', None)  # For continuations
     
     # Validate interaction type
     if interaction_type not in ['solo', 'dyadic', 'group']:
@@ -678,6 +685,14 @@ def create_simulation():
         return error_response("Dyadic interaction requires exactly 2 entities")
     elif interaction_type == 'group' and len(entity_ids) < 3:
         return error_response("Group interaction requires at least 3 entities")
+    
+    # Validate n_rounds is positive
+    try:
+        n_rounds = int(n_rounds)
+        if n_rounds <= 0:
+            return error_response("n_rounds must be a positive integer")
+    except ValueError:
+        return error_response("n_rounds must be a valid integer")
     
     # Check if LLM is configured
     if not lm:
@@ -697,13 +712,38 @@ def create_simulation():
     # Run simulation based on interaction type
     if interaction_type == 'solo':
         simulator = SoloInteractionSimulator()
-        result = simulator.forward(entities[0], context_desc)
+        prediction = simulator.forward(
+            entities[0], 
+            context_desc, 
+            n_rounds=n_rounds,
+            last_round_number=last_round_number,
+            previous_interaction=previous_interaction
+        )
+        # Extract the content from the prediction
+        result = prediction.content
     elif interaction_type == 'dyadic':
         simulator = DyadicInteractionSimulator()
-        result = simulator.forward(entities[0], entities[1], context_desc)
+        prediction = simulator.forward(
+            entities[0], 
+            entities[1], 
+            context_desc,
+            n_rounds=n_rounds,
+            last_round_number=last_round_number,
+            previous_interaction=previous_interaction
+        )
+        # Extract the content from the prediction
+        result = prediction.content
     else:  # group
         simulator = GroupInteractionSimulator()
-        result = simulator.forward(entities, context_desc)
+        prediction = simulator.forward(
+            entities, 
+            context_desc,
+            n_rounds=n_rounds,
+            last_round_number=last_round_number,
+            previous_interaction=previous_interaction
+        )
+        # Extract the content from the prediction
+        result = prediction.content
     
     # Save simulation result
     simulation_id = storage.save_simulation(
@@ -743,6 +783,15 @@ def get_simulation(simulation_id):
     for entity_id in simulation['entity_ids']:
         entity = storage.get_entity(entity_id)
         if entity:
+            # Add entity type information
+            entity_type = storage.get_entity_type(entity['entity_type_id'])
+            if entity_type:
+                entity['entity_type_name'] = entity_type['name']
+            
+            # Ensure entity description is included
+            if 'description' not in entity or not entity['description']:
+                entity['description'] = 'No description available'
+                
             entities.append(entity)
     
     simulation['entities'] = entities
@@ -751,8 +800,42 @@ def get_simulation(simulation_id):
     context = storage.get_context(simulation['context_id'])
     if context:
         simulation['context'] = context
+        
+        # Calculate simulation name (use first few words of context or generic name)
+        if not simulation.get('name'):
+            if context and context.get('description'):
+                words = context.get('description', '').split()
+                if len(words) > 5:
+                    name = ' '.join(words[:5]) + '...'
+                else:
+                    name = context.get('description')
+                simulation['name'] = name
+            else:
+                simulation['name'] = f"Simulation {simulation.get('id', '')[-6:]}"
+    
+    # Format timestamp if present
+    if 'timestamp' in simulation:
+        simulation['created_at'] = simulation['timestamp']
     
     return success_response(simulation)
+
+@app.route('/api/simulations/<simulation_id>', methods=['DELETE'])
+@handle_exceptions
+def delete_simulation(simulation_id):
+    """
+    Delete a simulation by ID.
+    
+    Args:
+        simulation_id: ID of the simulation to delete
+        
+    Returns:
+        JSON response indicating success or error
+    """
+    result = storage.delete_simulation(simulation_id)
+    if not result:
+        return error_response(f"Simulation with ID {simulation_id} not found or could not be deleted", 404)
+    
+    return success_response({"message": f"Simulation {simulation_id} deleted successfully"})
 
 @app.route('/api/simulations', methods=['GET'])
 @handle_exceptions
@@ -770,7 +853,48 @@ def get_simulations():
     """
     # TODO: Implement filtering
     simulations = storage.get_all_simulations()
-    return success_response(simulations)
+    
+    # Enhance simulation data with context descriptions and entity names
+    enhanced_simulations = []
+    for simulation in simulations:
+        # Add context information
+        context = storage.get_context(simulation['context_id'])
+        if context:
+            simulation['context'] = context.get('description', '')
+        else:
+            simulation['context'] = ''
+        
+        # Add basic entity information
+        entities_data = []
+        for entity_id in simulation.get('entity_ids', []):
+            entity = storage.get_entity(entity_id)
+            if entity:
+                entities_data.append({
+                    'id': entity.get('id'),
+                    'name': entity.get('name', 'Unnamed Entity')
+                })
+        
+        simulation['entities'] = entities_data
+        
+        # Calculate simulation name (use first few words of context or generic name)
+        if not simulation.get('name'):
+            if context and context.get('description'):
+                words = context.get('description', '').split()
+                if len(words) > 5:
+                    name = ' '.join(words[:5]) + '...'
+                else:
+                    name = context.get('description')
+                simulation['name'] = name
+            else:
+                simulation['name'] = f"Simulation {simulation.get('id', '')[-6:]}"
+        
+        # Format timestamp as ISO string for 'created_at'
+        if simulation.get('timestamp'):
+            simulation['created_at'] = simulation.get('timestamp')
+        
+        enhanced_simulations.append(simulation)
+    
+    return success_response(enhanced_simulations)
 
 @app.route('/api/templates', methods=['GET'])
 @handle_exceptions

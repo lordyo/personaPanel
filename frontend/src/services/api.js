@@ -365,6 +365,14 @@ const simulationApi = {
    * @returns {Promise} - The created simulation
    */
   create: (simulation) => post('/simulations', simulation),
+  
+  /**
+   * Delete a simulation by id.
+   * 
+   * @param {string} id - The simulation id to delete
+   * @returns {Promise} - Response indicating success or failure
+   */
+  delete: (id) => del(`/simulations/${id}`),
 }
 
 // Export a default API object with all the API functions
@@ -396,6 +404,7 @@ const api = {
   getSimulations: simulationApi.getAll,
   getSimulation: simulationApi.getById,
   createSimulation: simulationApi.create,
+  deleteSimulation: simulationApi.delete,
   
   // Original API objects
   entityType: entityTypeApi,

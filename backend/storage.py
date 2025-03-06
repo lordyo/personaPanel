@@ -518,29 +518,60 @@ def get_all_simulations() -> List[Dict[str, Any]]:
 
 def delete_entity(entity_id: str) -> bool:
     """
-    Delete a specific entity by ID.
+    Delete an entity by ID.
     
     Args:
         entity_id: The ID of the entity to delete
         
     Returns:
-        True if the entity was deleted, False if the entity was not found
+        True if the entity was deleted, False if not found
+    """
+    data_path = os.path.join(os.path.dirname(DB_PATH), 'entities', f"{entity_id}.json")
+    
+    if not os.path.exists(data_path):
+        logger = logging.getLogger('app')
+        logger.warning(f"Attempted to delete non-existent entity: {entity_id}")
+        return False
+    
+    try:
+        os.remove(data_path)
+        logger = logging.getLogger('app')
+        logger.info(f"Deleted entity: {entity_id}")
+        return True
+    except Exception as e:
+        logger = logging.getLogger('app')
+        logger.error(f"Error deleting entity {entity_id}: {str(e)}")
+        logger.exception("Entity deletion error:")
+        return False
+
+
+def delete_simulation(simulation_id: str) -> bool:
+    """
+    Delete a simulation by ID.
+    
+    Args:
+        simulation_id: The ID of the simulation to delete
+        
+    Returns:
+        True if the simulation was deleted, False if not found
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
-        # Check if entity exists
-        cursor.execute('SELECT id FROM entities WHERE id = ?', (entity_id,))
+        # Check if simulation exists
+        cursor.execute('SELECT id FROM simulations WHERE id = ?', (simulation_id,))
         if cursor.fetchone() is None:
             return False
         
-        # Delete the entity
-        cursor.execute('DELETE FROM entities WHERE id = ?', (entity_id,))
+        # Delete the simulation
+        cursor.execute('DELETE FROM simulations WHERE id = ?', (simulation_id,))
         conn.commit()
         return cursor.rowcount > 0
     except Exception as e:
-        print(f"Error deleting entity: {e}")
+        logger = logging.getLogger('app')
+        logger.error(f"Error deleting simulation {simulation_id}: {str(e)}")
+        logger.exception("Simulation deletion error:")
         conn.rollback()
         return False
     finally:
