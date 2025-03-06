@@ -101,6 +101,8 @@ class SimulationEngine:
         context: Context,
         entities: List[Dict[str, Any]],
         interaction_type: InteractionType = InteractionType.SOLO,
+        n_rounds: int = 1,
+        last_round_number: int = 0,
         previous_interaction: Optional[str] = None
     ) -> SimulationResult:
         """
@@ -110,14 +112,26 @@ class SimulationEngine:
             context: The context in which the entities will interact
             entities: List of entity instances to include in the simulation
             interaction_type: The type of interaction to simulate
+            n_rounds: Number of back-and-forth dialogue rounds (default: 1)
+            last_round_number: The last round number from previous calls (default: 0)
             previous_interaction: Optional previous interaction content
             
         Returns:
             The result of the simulation
         """
         content = ""
-        scratchpad = ""
+        final_round_number = last_round_number
         entity_ids = [entity.get('id', f"unknown-{i}") for i, entity in enumerate(entities)]
+        
+        # If n_rounds > 1, update context to indicate this is a multi-round simulation
+        context_description = context.description
+        if n_rounds > 1 and not "ROUND" in context_description:
+            context_description = f"{context_description}\n\nThis simulation should include {n_rounds} rounds of dialogue, starting from round {last_round_number + 1}."
+            context = Context(
+                id=context.id,
+                description=context_description,
+                metadata=context.metadata
+            )
         
         try:
             if interaction_type == InteractionType.SOLO:
@@ -128,10 +142,12 @@ class SimulationEngine:
                 result = self.solo_simulator(
                     entity=entities[0],
                     context=context.description,
+                    n_rounds=n_rounds,
+                    last_round_number=last_round_number,
                     previous_interaction=previous_interaction
                 )
                 content = result.content
-                scratchpad = result.scratchpad
+                final_round_number = getattr(result, 'final_round_number', last_round_number + n_rounds)
                 
             elif interaction_type == InteractionType.DYADIC:
                 if len(entities) != 2:
@@ -142,10 +158,12 @@ class SimulationEngine:
                     entity1=entities[0],
                     entity2=entities[1],
                     context=context.description,
+                    n_rounds=n_rounds,
+                    last_round_number=last_round_number,
                     previous_interaction=previous_interaction
                 )
                 content = result.content
-                scratchpad = result.scratchpad
+                final_round_number = getattr(result, 'final_round_number', last_round_number + n_rounds)
                 
             elif interaction_type == InteractionType.GROUP:
                 if len(entities) < 2:
@@ -155,10 +173,12 @@ class SimulationEngine:
                 result = self.group_simulator(
                     entities=entities,
                     context=context.description,
+                    n_rounds=n_rounds,
+                    last_round_number=last_round_number,
                     previous_interaction=previous_interaction
                 )
                 content = result.content
-                scratchpad = result.scratchpad
+                final_round_number = getattr(result, 'final_round_number', last_round_number + n_rounds)
             
             else:
                 raise ValueError(f"Unknown interaction type: {interaction_type}")
@@ -185,7 +205,9 @@ class SimulationEngine:
             entity_ids=entity_ids,
             content=content,
             metadata={
-                "scratchpad": scratchpad,
+                "n_rounds": n_rounds,
+                "last_round_number": last_round_number,
+                "final_round_number": final_round_number,
                 "previous_interaction": previous_interaction
             }
         ) 

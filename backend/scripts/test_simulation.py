@@ -102,7 +102,13 @@ def run_solo_simulation():
     # Create engine and context
     engine = SimulationEngine()
     context = engine.create_context(
-        "A coffee shop on a rainy morning. The atmosphere is quiet and contemplative, with soft jazz playing in the background."
+        """You have been invited to give feedback on a movie script. It's a reimagining of 'The Thing', but told from the perspective of the creature.
+        
+        ## Script
+        After drifting through the cold void for countless cycles, I crash upon a frozen world and enter hibernation. Awakened by strange bipedal creatures, I find myself exposed, vulnerable, and facing extinction. Their primitive thermal weapons burn through my cellular structure, but they fail to understand my nature—I am not one, but many, a collective that can divide, transform, and survive. Each of their cells I absorb teaches me more about their kind, allowing me to craft perfect replicas, indistinguishable from the originals. Their paranoia becomes my greatest weapon as they turn against each other, unable to discern friend from foe.
+        Their isolation becomes my opportunity as I work methodically through their outpost. The brilliant one nearly discovers a test to reveal my presence, but I adapt faster than they anticipate. Their leader destroys their escape vessels, trapping us all in the endless white. As their numbers dwindle, I prepare for a long hibernation once more. Perhaps their rescue teams will arrive eventually, providing new vessels to continue my journey. In the final confrontation, two survivors sit in the burning ruins, watching each other with suspicion as the cold creeps in. Neither trusts the other, and it doesn't matter—the cold preserves, and I am patient. I have all the time in the universe.
+        
+        """
     )
     
     # Run simulation with the first entity
@@ -119,8 +125,6 @@ def run_solo_simulation():
     print(f"CONTEXT: {context.description}")
     print("-"*80)
     print(result.content)
-    print("-"*80)
-    print(f"SCRATCHPAD: {result.metadata.get('scratchpad', '')}")
     print("="*80 + "\n")
     
     return result
@@ -133,25 +137,34 @@ def run_dyadic_simulation():
     # Create engine and context
     engine = SimulationEngine()
     context = engine.create_context(
-        "A product design meeting where team members are discussing the direction for a new app. There's a whiteboard filled with ideas and sketches."
+        """You are in a bar, discussing a novella idea a mutual friend of yours has given you. The friend, Jacob, is an aspiring writer.
+
+        ## Novella Idea
+        **Title:** Dinner for the Old Ones**
+
+        Jenkins shuffled around the ancient dining table, carefully arranging five place settings though only Miss Blackwood remained alive to sit at one. "The same procedure as last year, madam?" he inquired, his voice barely audible above the howling winds that perpetually surrounded the Blackwood estate. The elderly woman nodded, her eyes reflecting the strange constellation visible through the warped glass of the dining room windows. Jenkins bowed stiffly before proceeding to the silver cabinet, his hands trembling not from age but from the knowledge of what the night would bring.
+
+        As midnight approached, Jenkins served each empty chair in turn, pouring strange iridescent liquids and placing portions of food that writhed subtly upon ornate plates. "Admiral von Schneider," he announced to the first empty seat, where the air shimmered with an unnatural coldness. Moving to each position, Jenkins felt the familiar dread rising as he served "Mr. Winterbottom," "Sir Toby," and "Mr. Pommeroy"—names given long ago to entities that had no names in human tongues. With each serving, Jenkins consumed the offerings himself before moving to the next, his movements becoming increasingly erratic, his eyes bulging as otherworldly presences filled him, the ritual consumption binding the Old Ones to this plane for another year.
+
+        Miss Blackwood watched with terrible serenity as Jenkins completed the final course, his body now merely a vessel for four ancient consciousnesses. The chandelier swayed without breeze, shadows elongated beyond natural angles, and the floorboards pulsed like the membrane of some vast organ. "The same procedure as every year, Jenkins," Miss Blackwood whispered as she rose, her silhouette blending with the darkness until only her eyes remained visible. Jenkins, no longer merely Jenkins, replied in a chorus of voices that seemed to emanate from the walls themselves: "The same procedure as every year, Miss Blackwood," before the dining room folded inward upon impossible geometries, and the annual communion with the Old Ones truly began.
+        """
     )
     
     # Run simulation with the first two entities
     result = engine.run_simulation(
         context=context,
         entities=[SAMPLE_ENTITIES[0], SAMPLE_ENTITIES[1]],
-        interaction_type=InteractionType.DYADIC
+        interaction_type=InteractionType.DYADIC,
+        n_rounds=2  # Test with 2 rounds of dialogue
     )
     
     # Display results
     print("\n" + "="*80)
-    print(f"DYADIC SIMULATION RESULT: {SAMPLE_ENTITIES[0]['name']} and {SAMPLE_ENTITIES[1]['name']}")
+    print(f"DYADIC SIMULATION RESULT: {SAMPLE_ENTITIES[0]['name']} and {SAMPLE_ENTITIES[1]['name']} (2 rounds)")
     print("-"*80)
     print(f"CONTEXT: {context.description}")
     print("-"*80)
     print(result.content)
-    print("-"*80)
-    print(f"SCRATCHPAD: {result.metadata.get('scratchpad', '')}")
     print("="*80 + "\n")
     
     return result
@@ -164,25 +177,24 @@ def run_group_simulation():
     # Create engine and context
     engine = SimulationEngine()
     context = engine.create_context(
-        "A community town hall meeting discussing the proposal for a new technology center in the neighborhood. The room is divided with some residents excited about the economic opportunities while others are concerned about gentrification."
+        """You are on stage of a panel discussion at a local Comic Con. You have been given the topic of the first season of "Severance". """
     )
     
     # Run simulation with all three entities
     result = engine.run_simulation(
         context=context,
         entities=SAMPLE_ENTITIES,
-        interaction_type=InteractionType.GROUP
+        interaction_type=InteractionType.GROUP,
+        n_rounds=2  # Test with 2 rounds of dialogue
     )
     
     # Display results
     print("\n" + "="*80)
-    print(f"GROUP SIMULATION RESULT: {', '.join(entity['name'] for entity in SAMPLE_ENTITIES)}")
+    print(f"GROUP SIMULATION RESULT: {', '.join(entity['name'] for entity in SAMPLE_ENTITIES)} (2 rounds)")
     print("-"*80)
     print(f"CONTEXT: {context.description}")
     print("-"*80)
     print(result.content)
-    print("-"*80)
-    print(f"SCRATCHPAD: {result.metadata.get('scratchpad', '')}")
     print("="*80 + "\n")
     
     return result
@@ -216,8 +228,6 @@ def run_continuation_test(previous_result):
     print(f"CONTEXT: {context.description}")
     print("-"*80)
     print(result.content)
-    print("-"*80)
-    print(f"SCRATCHPAD: {result.metadata.get('scratchpad', '')}")
     print("="*80 + "\n")
     
     return result
@@ -225,6 +235,9 @@ def run_continuation_test(previous_result):
 
 def save_result_to_file(result, filename):
     """Save simulation result to a JSON file."""
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    
     # Convert datetime to string for serialization
     result_dict = {
         "id": result.id,
@@ -248,24 +261,25 @@ def main():
         # Setup DSPy
         setup_dspy()
         
-        # Create output directory
-        os.makedirs("simulation_results", exist_ok=True)
+        # Create output directory for results
+        results_dir = "simulation_results"
+        os.makedirs(results_dir, exist_ok=True)
         
         # Run solo simulation
         solo_result = run_solo_simulation()
-        save_result_to_file(solo_result, "simulation_results/solo_result.json")
+        save_result_to_file(solo_result, f"{results_dir}/solo_result.json")
         
         # Run dyadic simulation
         dyadic_result = run_dyadic_simulation()
-        save_result_to_file(dyadic_result, "simulation_results/dyadic_result.json")
+        save_result_to_file(dyadic_result, f"{results_dir}/dyadic_result.json")
         
         # Run group simulation
         group_result = run_group_simulation()
-        save_result_to_file(group_result, "simulation_results/group_result.json")
+        save_result_to_file(group_result, f"{results_dir}/group_result.json")
         
         # Run continuation test based on dyadic result
         continuation_result = run_continuation_test(dyadic_result)
-        save_result_to_file(continuation_result, "simulation_results/continuation_result.json")
+        save_result_to_file(continuation_result, f"{results_dir}/continuation_result.json")
         
         logger.info("All simulation tests completed successfully")
         
