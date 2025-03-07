@@ -12,6 +12,7 @@ import EntityList from './pages/EntityList';
 import SimulationCreate from './pages/SimulationCreate';
 import SimulationList from './pages/SimulationList';
 import SimulationDetail from './pages/SimulationDetail';
+import Settings from './pages/Settings';
 
 // Navigation Component with Tailwind
 const Navigation = () => {
@@ -21,7 +22,8 @@ const Navigation = () => {
   const navItems = [
     { name: 'Entity Types', path: '/entity-types' },
     { name: 'Entities', path: '/entities' },
-    { name: 'Simulations', path: '/simulations' }
+    { name: 'Simulations', path: '/simulations' },
+    { name: 'Settings', path: '/settings' }
   ];
   
   const isActive = (path) => {
@@ -172,6 +174,8 @@ function App() {
             <Route path="/simulations" element={<SimulationList />} />
             <Route path="/simulations/create" element={<SimulationCreate />} />
             <Route path="/simulations/:id" element={<SimulationDetail />} />
+            {/* Settings Route */}
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
         <footer className="py-4 px-6 bg-gray-800 border-t border-gray-700 text-center text-gray-400">

@@ -1540,6 +1540,166 @@ def delete_entity_type(entity_type_id):
         logger.error(f"Failed to delete entity type: {entity_type_id}")
         return error_response("Failed to delete entity type", 500)
 
+@app.route('/api/settings', methods=['GET'])
+@handle_exceptions
+def get_settings():
+    """
+    Get the application settings from the config file.
+    
+    Returns:
+        A JSON response with the settings data.
+    """
+    try:
+        # Use the correct path relative to the project root
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'llm_settings.json')
+        logger.info(f"Loading settings from: {config_path}")
+        
+        # Default settings structure
+        default_settings = {
+            "model_settings": {
+                "model": os.environ.get('DSPY_MODEL', 'gpt-4o-mini'),
+                "temperature": 1.0,
+                "max_tokens": 1000,
+                "cache": False,
+                "cache_in_memory": False,
+                "provider": "openai" # Default provider
+            }
+        }
+        
+        # Check if file exists
+        if not os.path.exists(config_path):
+            logger.info("Settings file doesn't exist, creating with defaults")
+            # Save default settings
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, 'w') as f:
+                json.dump(default_settings, f, indent=2)
+            return jsonify(default_settings)
+        
+        # Read the settings from the config file
+        with open(config_path, 'r') as f:
+            settings = json.load(f)
+        
+        # Fix nested data structure if it exists
+        if 'data' in settings and isinstance(settings['data'], dict):
+            if 'model_settings' in settings['data']:
+                settings['model_settings'] = settings['data']['model_settings']
+            if 'status' in settings['data']:
+                del settings['data']['status']
+            del settings['data']
+        
+        # Ensure we have the model_settings property
+        if 'model_settings' not in settings:
+            logger.info("Adding missing model_settings to loaded settings")
+            settings['model_settings'] = default_settings['model_settings']
+        
+        # Add provider field if missing
+        if 'provider' not in settings['model_settings']:
+            # Determine provider based on model
+            model = settings['model_settings']['model']
+            if model.startswith('claude'):
+                settings['model_settings']['provider'] = 'anthropic'
+            else:
+                settings['model_settings']['provider'] = 'openai'
+        
+        # Clean up any extraneous fields
+        if 'status' in settings:
+            del settings['status']
+            
+        # Save the cleaned structure back to the file
+        with open(config_path, 'w') as f:
+            json.dump(settings, f, indent=2)
+            
+        logger.info(f"Returning settings: {json.dumps(settings)}")
+        # Return directly without nesting
+        return jsonify(settings)
+    except Exception as e:
+        logger.error(f"Error reading settings: {str(e)}")
+        # Return a default settings object instead of an error
+        default_settings = {
+            "model_settings": {
+                "model": os.environ.get('DSPY_MODEL', 'gpt-4o-mini'),
+                "temperature": 1.0,
+                "max_tokens": 1000,
+                "cache": False,
+                "cache_in_memory": False,
+                "provider": "openai"
+            }
+        }
+        return jsonify(default_settings)
+
+@app.route('/api/settings', methods=['POST'])
+@handle_exceptions
+def update_settings():
+    """
+    Update the application settings in the config file.
+    
+    Returns:
+        A JSON response indicating success or failure.
+    """
+    try:
+        # Get the settings from the request body
+        settings = request.json
+        logger.info(f"Received settings update: {json.dumps(settings)}")
+        
+        # Validate settings
+        if 'model_settings' not in settings:
+            return jsonify({"error": "Invalid settings: 'model_settings' field is required"}), 400
+        
+        model_settings = settings['model_settings']
+        if 'model' not in model_settings:
+            return jsonify({"error": "Invalid settings: 'model' field is required"}), 400
+        
+        # Ensure model is one of the allowed values
+        allowed_models = ['gpt-4o-mini', 'gpt-4o', 'anthropic/claude-3-5-haiku-20241022']
+        if model_settings['model'] not in allowed_models:
+            return jsonify({"error": f"Invalid model: must be one of {', '.join(allowed_models)}"}), 400
+        
+        # Determine provider based on model
+        if model_settings['model'] == 'anthropic/claude-3-5-haiku-20241022':
+            provider = 'anthropic'
+            # Check if CLAUDE_API_KEY is available
+            if not os.environ.get('CLAUDE_API_KEY'):
+                return jsonify({"error": "CLAUDE_API_KEY not found in environment variables"}), 400
+        else:
+            provider = 'openai'
+            # Check if OPENAI_API_KEY is available
+            if not os.environ.get('OPENAI_API_KEY'):
+                return jsonify({"error": "OPENAI_API_KEY not found in environment variables"}), 400
+        
+        # Update the environment variable for immediate effect
+        if model_settings['model'] == 'anthropic/claude-3-5-haiku-20241022':
+            os.environ['DSPY_MODEL'] = model_settings['model']
+        else:
+            os.environ['DSPY_MODEL'] = model_settings['model']
+        
+        # Use the correct path relative to the project root
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'llm_settings.json')
+        
+        # Make sure config directory exists
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        
+        # Clean settings object before saving
+        clean_settings = {
+            "model_settings": {
+                "model": model_settings['model'],
+                "temperature": model_settings.get('temperature', 1.0),
+                "max_tokens": model_settings.get('max_tokens', 1000),
+                "cache": model_settings.get('cache', False),
+                "cache_in_memory": model_settings.get('cache_in_memory', False),
+                "provider": provider
+            }
+        }
+        
+        # Write the settings to the config file
+        with open(config_path, 'w') as f:
+            json.dump(clean_settings, f, indent=2)
+        
+        logger.info(f"Updated settings: {json.dumps(clean_settings)}")
+        return jsonify({"message": "Settings updated successfully"})
+    except Exception as e:
+        logger.error(f"Error updating settings: {str(e)}")
+        return jsonify({"error": f"Failed to update settings: {str(e)}"}), 400
+
 if __name__ == '__main__':
     # Use environment variable for port or default to 5001 (avoiding common 5000 port)
     port = int(os.environ.get('BACKEND_PORT', 5001))

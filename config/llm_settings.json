@@ -1,9 +1,10 @@
 {
   "model_settings": {
     "model": "gpt-4o",
-    "temperature": 1.2,
+    "temperature": 2,
+    "max_tokens": 1000,
     "cache": false,
     "cache_in_memory": false,
-    "max_tokens": 1000
+    "provider": "openai"
   }
-} 
+}

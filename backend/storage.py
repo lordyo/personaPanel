@@ -629,15 +629,22 @@ def delete_entity(entity_id: str) -> bool:
     Returns:
         True if the entity was deleted, False if not found
     """
-    data_path = os.path.join(os.path.dirname(DB_PATH), 'entities', f"{entity_id}.json")
-    
-    if not os.path.exists(data_path):
-        logger = logging.getLogger('app')
-        logger.warning(f"Attempted to delete non-existent entity: {entity_id}")
-        return False
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
     
     try:
-        os.remove(data_path)
+        # Check if entity exists
+        cursor.execute('SELECT id FROM entities WHERE id = ?', (entity_id,))
+        if cursor.fetchone() is None:
+            logger = logging.getLogger('app')
+            logger.warning(f"Attempted to delete non-existent entity: {entity_id}")
+            conn.close()
+            return False
+        
+        # Delete the entity from the database
+        cursor.execute('DELETE FROM entities WHERE id = ?', (entity_id,))
+        conn.commit()
+        
         logger = logging.getLogger('app')
         logger.info(f"Deleted entity: {entity_id}")
         return True
@@ -645,7 +652,10 @@ def delete_entity(entity_id: str) -> bool:
         logger = logging.getLogger('app')
         logger.error(f"Error deleting entity {entity_id}: {str(e)}")
         logger.exception("Entity deletion error:")
+        conn.rollback()
         return False
+    finally:
+        conn.close()
 
 
 def delete_simulation(simulation_id: str) -> bool:
