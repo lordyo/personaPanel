@@ -22,6 +22,7 @@ const EntityTypeCreate = () => {
   ]);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   
   const handleUpdateDimension = (index, updatedDimension) => {
     // Create a deep copy to prevent reference issues
@@ -57,6 +58,40 @@ const EntityTypeCreate = () => {
         type: ''
       }
     ]);
+  };
+  
+  const handleSuggestDimensions = async () => {
+    // Clear any previous errors
+    setError(null);
+    
+    // Validate that we have a name
+    if (!name.trim()) {
+      setError('Please enter an entity type name before suggesting dimensions');
+      return;
+    }
+    
+    try {
+      // Set suggesting state to true to show loading indicator
+      setSuggesting(true);
+      
+      // Call the API to suggest dimensions
+      const response = await entityTypeApi.suggestDimensions(name, description);
+      
+      // Check if the response was successful
+      if (response.status === 'success' && response.data && response.data.dimensions) {
+        // Replace existing dimensions with suggested ones
+        setDimensions(response.data.dimensions);
+      } else {
+        // Handle error in the response
+        setError(response.message || 'Failed to suggest dimensions. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error suggesting dimensions:', error);
+      setError('An error occurred while suggesting dimensions. Please try again.');
+    } finally {
+      // Set suggesting state back to false
+      setSuggesting(false);
+    }
   };
   
   const validateForm = () => {
@@ -322,6 +357,37 @@ const EntityTypeCreate = () => {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe this entity type"
             />
+          </div>
+          
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className={`flex items-center px-4 py-2 rounded ${
+                suggesting ? 'bg-blue-700 opacity-75 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'
+              } text-white transition`}
+              onClick={handleSuggestDimensions}
+              disabled={suggesting}
+            >
+              {suggesting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                  Suggest Dimensions with AI
+                </>
+              )}
+            </button>
+          </div>
+          <div className="mt-2 text-sm text-gray-500 italic">
+            Click "Suggest Dimensions" to use AI to automatically generate relevant dimensions based on the entity type name and description you provided. This will replace any existing dimensions.
           </div>
         </div>
         
