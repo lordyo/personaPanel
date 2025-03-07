@@ -1,0 +1,18 @@
+{
+  "id": "c7da78fe-a05b-4353-9c24-071717f30ee3",
+  "timestamp": "2025-03-07T10:13:09.032190",
+  "context_id": "499cc052-8c16-4594-a241-25dba9e5d4d3",
+  "interaction_type": "group",
+  "entity_ids": [
+    "entity-001",
+    "entity-002",
+    "entity-003"
+  ],
+  "content": "This is a placeholder for a group interaction between Alex Chen, Morgan Taylor, Jordan Rivera.\nContext: You are on stage of a panel discussion at a local Comic Con. You have been given the topic of the first season of \"Severance\".\n\nThis simulation should include 2 rounds of dialogue, starting from round 1.\nThis is round 1",
+  "metadata": {
+    "last_round_number": 0,
+    "dialogue_turns": 2,
+    "final_round_number": 2,
+    "previous_interaction": null
+  }
+}

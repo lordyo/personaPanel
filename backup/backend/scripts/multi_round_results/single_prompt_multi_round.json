@@ -1,0 +1,17 @@
+{
+  "id": "daca26ca-a4ea-43d9-8152-01c2f03376bd",
+  "timestamp": "2025-03-07T09:49:10.827255",
+  "context_id": "4966cdc8-f6f9-4412-976e-6b95f4897665",
+  "interaction_type": "dyadic",
+  "entity_ids": [
+    "entity-001",
+    "entity-002"
+  ],
+  "content": "ROUND 1\nAlex Chen: *I wonder how Morgan will react to my app idea. I hope it aligns with their marketing expertise.*  \n'So, Morgan, I\u2019ve been thinking about this app that could help users track their mental health through daily reflections. What do you think?'\n\nMorgan Taylor: *This sounds intriguing! I can already see the potential for a strong marketing angle.*  \n'I love the concept, Alex! Mental health is such an important topic. How do you envision the user experience?'\n\nROUND 2\nAlex Chen: *Morgan seems genuinely interested. I should elaborate on the technical aspects.*  \n'Well, I imagine a simple interface where users can log their thoughts and feelings, and the app could provide insights based on their entries. It would use data analytics to personalize the experience.'\n\nMorgan Taylor: *Data analytics? That\u2019s a great selling point! I can already think of some catchy taglines.*  \n'That\u2019s fantastic! We could market it as a \u201cpersonal mental wellness coach.\u201d Have you thought about how we could engage users to keep them coming back?'\n\nROUND 3\nAlex Chen: *Engagement is crucial. I need to think of features that will keep users invested.*  \n'Yes, I was considering adding gamification elements, like daily challenges or rewards for consistent journaling. What do you think would resonate with users?'\n\nMorgan Taylor: *Gamification could definitely boost engagement! I can visualize a campaign around it.*  \n'That\u2019s a smart move! We could create social media challenges to encourage sharing their progress. Let\u2019s brainstorm some ideas for that!'",
+  "metadata": {
+    "n_rounds": 3,
+    "last_round_number": 0,
+    "final_round_number": 3,
+    "previous_interaction": null
+  }
+}

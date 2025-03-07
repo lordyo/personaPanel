@@ -1,0 +1,17 @@
+{
+  "id": "36bcc881-5b15-4d6d-9456-e50ccc03e26b",
+  "timestamp": "2025-03-07T10:13:44.140922",
+  "context_id": "5930c150-b0ef-4727-8af9-a1f38e70c58a",
+  "interaction_type": "dyadic",
+  "entity_ids": [
+    "entity-001",
+    "entity-002"
+  ],
+  "content": "This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.\nContext: Two team members discussing UI design for a new app.\nPrevious interaction: This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.\nContext: Two team members discussing UI design for a new app.\nThis is round 1\nThis is round 2",
+  "metadata": {
+    "last_round_number": 1,
+    "dialogue_turns": 1,
+    "final_round_number": 2,
+    "previous_interaction": "This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.\nContext: Two team members discussing UI design for a new app.\nThis is round 1"
+  }
+}

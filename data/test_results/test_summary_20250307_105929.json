@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-03-07T10:59:29.883880",
+  "total_tests": 8,
+  "successful_tests": 8,
+  "failed_tests": 0,
+  "results": {
+    "solo_1turn_1round": {
+      "status": "success",
+      "file": "../../data/test_results/test_solo_1turn_1round_20250307_105929.json"
+    },
+    "solo_3turns_1round": {
+      "status": "success",
+      "file": "../../data/test_results/test_solo_3turns_1round_20250307_105929.json"
+    },
+    "solo_1turn_2rounds": {
+      "status": "success",
+      "file": "../../data/test_results/test_solo_1turn_2rounds_20250307_105929.json"
+    },
+    "solo_3turns_2rounds": {
+      "status": "success",
+      "file": "../../data/test_results/test_solo_3turns_2rounds_20250307_105929.json"
+    },
+    "group_1turn_1round": {
+      "status": "success",
+      "file": "../../data/test_results/test_group_1turn_1round_20250307_105929.json"
+    },
+    "group_3turns_1round": {
+      "status": "success",
+      "file": "../../data/test_results/test_group_3turns_1round_20250307_105929.json"
+    },
+    "group_1turn_2rounds": {
+      "status": "success",
+      "file": "../../data/test_results/test_group_1turn_2rounds_20250307_105929.json"
+    },
+    "group_3turns_2rounds": {
+      "status": "success",
+      "file": "../../data/test_results/test_group_3turns_2rounds_20250307_105929.json"
+    }
+  }
+}

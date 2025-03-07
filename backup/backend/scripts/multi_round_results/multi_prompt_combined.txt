@@ -1,0 +1,28 @@
+
+
+==================== ROUND 1 ====================
+
+This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.
+Context: Two team members discussing UI design for a new app.
+This is round 1
+
+==================== ROUND 2 ====================
+
+This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.
+Context: Two team members discussing UI design for a new app.
+Previous interaction: This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.
+Context: Two team members discussing UI design for a new app.
+This is round 1
+This is round 2
+
+==================== ROUND 3 ====================
+
+This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.
+Context: Two team members discussing UI design for a new app.
+Previous interaction: This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.
+Context: Two team members discussing UI design for a new app.
+Previous interaction: This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.
+Context: Two team members discussing UI design for a new app.
+This is round 1
+This is round 2
+This is round 3

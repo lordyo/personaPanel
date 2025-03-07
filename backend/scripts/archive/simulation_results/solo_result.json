@@ -1,0 +1,16 @@
+{
+  "id": "4adae1cc-e446-4a75-9212-535299be7603",
+  "timestamp": "2025-03-07T10:13:09.031608",
+  "context_id": "6723f213-59b9-472a-be72-8c8986101aa2",
+  "interaction_type": "solo",
+  "entity_ids": [
+    "entity-001"
+  ],
+  "content": "This is a placeholder for a solo interaction by Alex Chen.\nContext: You have been invited to give feedback on a movie script. It's a reimagining of 'The Thing', but told from the perspective of the creature.\n\n## Script\nAfter drifting through the cold void for countless cycles, I crash upon a frozen world and enter hibernation. Awakened by strange bipedal creatures, I find myself exposed, vulnerable, and facing extinction. Their primitive thermal weapons burn through my cellular structure, but they fail to understand my nature\u2014I am not one, but many, a collective that can divide, transform, and survive. Each of their cells I absorb teaches me more about their kind, allowing me to craft perfect replicas, indistinguishable from the originals. Their paranoia becomes my greatest weapon as they turn against each other, unable to discern friend from foe.\nTheir isolation becomes my opportunity as I work methodically through their outpost. The brilliant one nearly discovers a test to reveal my presence, but I adapt faster than they anticipate. Their leader destroys their escape vessels, trapping us all in the endless white. As their numbers dwindle, I prepare for a long hibernation once more. Perhaps their rescue teams will arrive eventually, providing new vessels to continue my journey. In the final confrontation, two survivors sit in the burning ruins, watching each other with suspicion as the cold creeps in. Neither trusts the other, and it doesn't matter\u2014the cold preserves, and I am patient. I have all the time in the universe.\nThis is round 1",
+  "metadata": {
+    "last_round_number": 0,
+    "dialogue_turns": 1,
+    "final_round_number": 1,
+    "previous_interaction": null
+  }
+}

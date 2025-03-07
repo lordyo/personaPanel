@@ -1,0 +1,17 @@
+{
+  "id": "1155a291-f851-4348-bd24-0bbc72b86de3",
+  "timestamp": "2025-03-07T10:59:29.863125",
+  "context_id": "93b759bf-6452-4df4-998e-8a9310b7d949",
+  "interaction_type": "solo",
+  "entity_ids": [
+    "entity-001"
+  ],
+  "content": "Tenzin Dorje sits cross-legged on a cushion, the soft light of the retreat center illuminating his serene face. He looks around at the participants, each lost in their thoughts, and begins to speak in a calm, measured tone.\n\n\"Dear friends,\" he begins, \"as we gather in this sacred space, I invite you to reflect on your life journey. Each of us carries a unique story, woven with threads of joy, sorrow, and learning. What moments stand out for you? What lessons have you gathered along the way?\"\n\nHe pauses, allowing the weight of his words to settle in the air, encouraging the participants to delve deeper into their reflections.",
+  "metadata": {
+    "n_turns": 1,
+    "last_turn_number": 0,
+    "final_turn_number": 1,
+    "simulation_rounds": 1,
+    "previous_interaction": null
+  }
+}
