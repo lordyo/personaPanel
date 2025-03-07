@@ -16,6 +16,9 @@ from dotenv import load_dotenv
 from logging.handlers import RotatingFileHandler
 import json
 import datetime
+import sqlite3
+import re
+import copy
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,6 +30,7 @@ from llm.dspy_modules import EntityGenerator
 import storage as storage
 from core.templates import get_template_names, get_template
 from llm.simulation_modules import SoloInteractionSimulator, DyadicInteractionSimulator, GroupInteractionSimulator, LLMError
+from llm.interaction_module import InteractionSimulator
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -1035,6 +1039,402 @@ def test_endpoint():
         "message": "API is functioning correctly!",
         "time": datetime.datetime.now().isoformat()
     })
+
+@app.route('/api/unified-simulations', methods=['POST'])
+@handle_exceptions
+def create_unified_simulation():
+    """
+    Create a new simulation using the unified simulation framework.
+    
+    This endpoint creates a simulation that works with any number of entities,
+    from solo interactions to group discussions.
+    
+    Request body:
+        context: Text description of the situation or environment
+        entities: List of entity IDs to include in the simulation
+        n_turns: Number of turns to generate in each round (default: 1)
+        simulation_rounds: Number of sequential LLM calls to make (default: 1)
+        metadata: Optional metadata for the simulation
+        name: Optional name for the simulation
+    
+    Returns:
+        JSON response with simulation details
+    """
+    data = request.json
+    
+    # Extract request data
+    context_desc = data.get('context')
+    entity_ids = data.get('entities', [])
+    n_turns = int(data.get('n_turns', 1))
+    simulation_rounds = int(data.get('simulation_rounds', 1))
+    metadata = data.get('metadata', {})
+    simulation_name = data.get('name')
+    
+    # Validate inputs
+    if not context_desc:
+        return error_response("Context is required")
+    
+    if not entity_ids:
+        return error_response("At least one entity is required")
+    
+    # Create the context
+    context_id = storage.save_context(context_desc)
+    
+    # Get the entities
+    entities = []
+    for entity_id in entity_ids:
+        entity = storage.get_entity(entity_id)
+        if not entity:
+            return error_response(f"Entity with ID {entity_id} not found", 404)
+        entities.append(entity)
+    
+    # Determine interaction type
+    if len(entities) == 1:
+        interaction_type = "solo"
+    elif len(entities) == 2:
+        interaction_type = "dyadic"
+    else:
+        interaction_type = "group"
+    
+    # Initialize the simulator
+    simulator = InteractionSimulator()
+    
+    # Run the simulation
+    result = simulator.forward(
+        entities=entities,
+        context=context_desc,
+        n_turns=n_turns
+    )
+    
+    content = result.content
+    final_turn_number = result.final_turn_number
+    
+    # Run additional rounds if requested
+    for round_num in range(1, simulation_rounds):
+        # Pass the previous content and final turn number for continuation
+        round_result = simulator.forward(
+            entities=entities,
+            context=context_desc,
+            n_turns=n_turns,
+            last_turn_number=final_turn_number,
+            previous_interaction=content
+        )
+        
+        # Append the new content
+        content += f"\n\n{round_result.content}"
+        final_turn_number = round_result.final_turn_number
+    
+    # Update metadata with rounds info
+    metadata['simulation_rounds'] = simulation_rounds
+    metadata['n_turns'] = n_turns
+    metadata['total_turns'] = n_turns * simulation_rounds
+    
+    # If no name provided, create one with the entities
+    if not simulation_name:
+        entity_names = [entity.get('name', 'Unknown') for entity in entities]
+        if len(entity_names) <= 3:
+            combined_names = ", ".join(entity_names)
+            simulation_name = f"{interaction_type.capitalize()} interaction: {combined_names}"
+        else:
+            simulation_name = f"{interaction_type.capitalize()} interaction with {len(entity_names)} entities"
+    
+    # Save the simulation
+    simulation_id = storage.save_simulation(
+        context_id=context_id,
+        interaction_type=interaction_type,
+        entity_ids=entity_ids,
+        content=content,
+        metadata=metadata,
+        final_turn_number=final_turn_number,
+        name=simulation_name
+    )
+    
+    # Return the result
+    return success_response({
+        "id": simulation_id,
+        "context_id": context_id,
+        "result": content,
+        "interaction_type": interaction_type,
+        "entity_count": len(entities),
+        "final_turn_number": final_turn_number
+    })
+
+@app.route('/api/unified-simulations/<simulation_id>', methods=['GET'])
+@handle_exceptions
+def get_unified_simulation(simulation_id):
+    """
+    Retrieve a simulation created with the unified simulation system.
+    
+    Args:
+        simulation_id: The ID of the simulation to retrieve
+        
+    Returns:
+        JSON response with the simulation details
+    """
+    logger = logging.getLogger('app')
+    logger.debug(f"Retrieving simulation with ID: {simulation_id}")
+    
+    # Get the simulation from storage
+    simulation = storage.get_simulation(simulation_id)
+    
+    if not simulation:
+        logger.warning(f"Simulation with ID {simulation_id} not found")
+        return error_response(f"Simulation with ID {simulation_id} not found", 404)
+    
+    logger.debug(f"Retrieved simulation data: {json.dumps(simulation, default=str)}")
+    
+    # Get the context
+    context = storage.get_context(simulation['context_id'])
+    
+    # Get the entities
+    entities = []
+    for entity_id in simulation['entity_ids']:
+        entity = storage.get_entity(entity_id)
+        if entity:
+            entities.append({
+                "id": entity_id,
+                "name": entity.get('name', 'Unknown'),
+                "description": entity.get('description', '')
+            })
+    
+    # Extract final_turn_number, ensuring it's an integer
+    final_turn_number = 0
+    if 'final_turn_number' in simulation:
+        try:
+            final_turn_number = int(simulation['final_turn_number'])
+            logger.debug(f"Final turn number from simulation: {final_turn_number}")
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid final_turn_number in simulation: {simulation.get('final_turn_number')}")
+    else:
+        logger.warning("No final_turn_number found in simulation data")
+    
+    # Determine if this was a unified simulation (we could add a flag in the metadata)
+    # For now, include all simulations in the response
+    
+    return success_response({
+        "id": simulation_id,
+        "context": context['description'] if context else "",
+        "context_id": simulation['context_id'],
+        "interaction_type": simulation['interaction_type'],
+        "result": simulation['content'],
+        "entities": entities,
+        "created_at": simulation.get('timestamp', ''),
+        "metadata": simulation.get('metadata', {}),
+        "final_turn_number": final_turn_number
+    })
+
+@app.route('/api/unified-simulations', methods=['GET'])
+@handle_exceptions
+def get_unified_simulations():
+    """
+    Retrieve a list of all simulations.
+    
+    Can be filtered using query parameters:
+        entity_id: Filter by entity ID
+        entity_type_id: Filter by entity type ID
+        interaction_type: Filter by interaction type (solo, dyadic, group)
+        limit: Maximum number of simulations to return (default: 20)
+        offset: Number of simulations to skip (for pagination)
+    
+    Returns:
+        JSON response with the list of simulations
+    """
+    # Get query parameters
+    entity_id = request.args.get('entity_id')
+    entity_type_id = request.args.get('entity_type_id')
+    interaction_type = request.args.get('interaction_type')
+    limit = int(request.args.get('limit', 20))
+    offset = int(request.args.get('offset', 0))
+    
+    # Get all simulations
+    simulations = storage.get_simulations(
+        entity_id=entity_id,
+        entity_type_id=entity_type_id,
+        interaction_type=interaction_type,
+        limit=limit,
+        offset=offset
+    )
+    
+    # Format the response
+    result = []
+    for sim in simulations:
+        # Get the context
+        context = storage.get_context(sim['context_id'])
+        
+        # Get entity names
+        entity_names = []
+        for entity_id in sim['entity_ids']:
+            entity = storage.get_entity(entity_id)
+            if entity:
+                entity_names.append(entity.get('name', 'Unknown'))
+        
+        result.append({
+            "id": sim['id'],
+            "context_id": sim['context_id'],
+            "context": context['description'] if context else "",
+            "interaction_type": sim['interaction_type'],
+            "entity_ids": sim['entity_ids'],
+            "entity_names": entity_names,
+            "created_at": sim.get('timestamp', ''),
+            "summary": sim.get('metadata', {}).get('summary', ''),
+            "final_turn_number": sim.get('final_turn_number', 0)
+        })
+    
+    return success_response(result)
+
+@app.route('/api/unified-simulations/<simulation_id>/continue', methods=['POST'])
+@handle_exceptions
+def continue_unified_simulation(simulation_id):
+    """
+    Continue an existing simulation with more turns.
+    
+    Args:
+        simulation_id: The ID of the simulation to continue
+        
+    Returns:
+        JSON response with the updated simulation
+    """
+    logger = logging.getLogger('app')
+    logger.info(f"Continuing simulation: {simulation_id}")
+    
+    # Get the simulation data from storage
+    simulation = storage.get_simulation(simulation_id)
+    
+    if not simulation:
+        return error_response(f"Simulation with ID {simulation_id} not found", 404)
+    
+    # Parse request data
+    data = request.json
+    n_turns = data.get('n_turns', 1)
+    simulation_rounds = data.get('simulation_rounds', 1)
+    
+    # Get the context
+    context = storage.get_context(simulation['context_id'])
+    if not context:
+        return error_response(f"Context not found for simulation {simulation_id}", 404)
+    
+    # Get the entities
+    entities = []
+    for entity_id in simulation['entity_ids']:
+        entity = storage.get_entity(entity_id)
+        if entity:
+            entities.append(entity)
+    
+    # Set up the last turn number from the simulation
+    # This might be missing if the database schema was updated
+    try:
+        last_turn_number = int(simulation.get('final_turn_number', 0))
+        logger.debug(f"Last turn number from database: {last_turn_number}")
+    except (ValueError, TypeError):
+        # If final_turn_number is invalid, try to extract it from the content
+        logger.warning(f"Invalid or missing final_turn_number for simulation {simulation_id}, extracting from content")
+        last_turn_number = 0
+        content = simulation.get('content', '')
+        # Try to find the last turn number in the content
+        turn_matches = re.findall(r'TURN (\d+)', content)
+        if turn_matches:
+            try:
+                last_turn_number = int(turn_matches[-1])
+                logger.debug(f"Extracted last turn number from content: {last_turn_number}")
+            except (ValueError, IndexError):
+                logger.warning("Failed to extract valid turn number from content")
+    
+    # Initialize simulator
+    from llm.interaction_module import InteractionSimulator
+    simulator = InteractionSimulator()
+    
+    # Continue the simulation
+    final_content = simulation.get('content', '')
+    final_turn_number = last_turn_number
+    
+    # Make a copy of the metadata to avoid modifying the original
+    metadata = copy.deepcopy(simulation.get('metadata', {}) or {})
+    
+    context_str = context.get('description', '')
+    
+    for _ in range(simulation_rounds):
+        logger.debug(f"Starting simulation round with last_turn_number={final_turn_number}")
+        result = simulator.forward(
+            entities=entities,
+            context=context_str,
+            n_turns=n_turns,
+            last_turn_number=final_turn_number,
+            previous_interaction=final_content
+        )
+        
+        # Append the new content
+        if final_content and not final_content.endswith('\n\n'):
+            final_content += '\n\n'
+        final_content += result.content
+        
+        # Update the final turn number
+        final_turn_number = int(result.final_turn_number)
+        logger.debug(f"Updated final_turn_number to {final_turn_number}")
+    
+    # Update the metadata to include rounds and turns info
+    if 'simulation_rounds' not in metadata:
+        metadata['simulation_rounds'] = 0
+    metadata['simulation_rounds'] += simulation_rounds
+    
+    if 'total_turns' not in metadata:
+        metadata['total_turns'] = 0
+    metadata['total_turns'] += n_turns * simulation_rounds
+    
+    # Update the simulation in storage
+    try:
+        updated_simulation = storage.update_simulation(
+            simulation_id=simulation_id,
+            content=final_content,
+            metadata=metadata,
+            final_turn_number=final_turn_number
+        )
+        
+        logger.info(f"Successfully updated simulation {simulation_id} with final_turn_number={final_turn_number}")
+        
+        # Return the updated simulation with the correct final_turn_number
+        return success_response({
+            "id": simulation_id,
+            "context_id": simulation['context_id'],
+            "result": final_content,
+            "interaction_type": simulation['interaction_type'],
+            "entity_count": len(entities),
+            "final_turn_number": final_turn_number
+        })
+        
+    except sqlite3.OperationalError as e:
+        # If the error is about the final_turn_number column not existing
+        if 'no such column: final_turn_number' in str(e):
+            logger.warning(f"final_turn_number column missing: {str(e)}")
+            
+            # Simply update without the final_turn_number
+            metadata['final_turn_number'] = final_turn_number  # Store in metadata instead
+            
+            try:
+                storage.update_simulation(
+                    simulation_id=simulation_id,
+                    content=final_content,
+                    metadata=metadata
+                )
+                
+                logger.info(f"Updated simulation {simulation_id} without final_turn_number column (stored in metadata)")
+                
+                # Return the response with the final_turn_number even though it wasn't stored in the column
+                return success_response({
+                    "id": simulation_id,
+                    "context_id": simulation['context_id'],
+                    "result": final_content,
+                    "interaction_type": simulation['interaction_type'],
+                    "entity_count": len(entities),
+                    "final_turn_number": final_turn_number
+                })
+                
+            except Exception as inner_e:
+                logger.error(f"Error updating simulation without final_turn_number: {str(inner_e)}")
+                return error_response(f"Error updating simulation: {str(inner_e)}", 500)
+        else:
+            # Re-raise if it's a different operational error
+            logger.error(f"SQLite error: {str(e)}")
+            return error_response(f"Database error: {str(e)}", 500)
 
 if __name__ == '__main__':
     # Use environment variable for port or default to 5001 (avoiding common 5000 port)

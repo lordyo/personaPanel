@@ -80,6 +80,7 @@ def init_db():
         entity_ids TEXT NOT NULL,  -- JSON array of entity IDs
         content TEXT NOT NULL,
         metadata TEXT,  -- JSON string
+        final_turn_number INTEGER NOT NULL,
         FOREIGN KEY (context_id) REFERENCES contexts (id)
     )
     ''')
@@ -415,7 +416,9 @@ def save_simulation(
     interaction_type: str,
     entity_ids: List[str],
     content: str,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
+    final_turn_number: Optional[int] = 0,
+    name: Optional[str] = None
 ) -> str:
     """
     Save a simulation result to the database.
@@ -426,6 +429,8 @@ def save_simulation(
         entity_ids: List of entity IDs that participated
         content: Generated content from the simulation
         metadata: Optional metadata dictionary
+        final_turn_number: Final turn number for the simulation (default: 0)
+        name: Optional name for the simulation
         
     Returns:
         ID of the saved simulation
@@ -433,24 +438,52 @@ def save_simulation(
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    # Get column names to ensure we're providing the right number of values
+    cursor.execute('PRAGMA table_info(simulations)')
+    columns = [col[1] for col in cursor.fetchall()]
+    
     simulation_id = str(uuid.uuid4())
     timestamp = datetime.datetime.now().isoformat()
     
-    cursor.execute(
-        'INSERT INTO simulations VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (
-            simulation_id,
-            timestamp,
-            context_id,
-            interaction_type,
-            json.dumps(entity_ids),
-            content,
-            json.dumps(metadata) if metadata else None
+    # Default simulation name if not provided
+    if name is None:
+        name = f"Simulation {timestamp[:10]}"
+    
+    # Handle case where table has a name column
+    if 'name' in columns:
+        cursor.execute(
+            'INSERT INTO simulations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (
+                simulation_id,
+                timestamp,
+                context_id,
+                interaction_type,
+                json.dumps(entity_ids),
+                content,
+                json.dumps(metadata) if metadata else None,
+                name,
+                final_turn_number
+            )
         )
-    )
+    else:
+        # Fallback for older schema without name column
+        cursor.execute(
+            'INSERT INTO simulations VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (
+                simulation_id,
+                timestamp,
+                context_id,
+                interaction_type,
+                json.dumps(entity_ids),
+                content,
+                json.dumps(metadata) if metadata else None,
+                final_turn_number
+            )
+        )
     
     conn.commit()
     conn.close()
+    
     return simulation_id
 
 
@@ -467,6 +500,10 @@ def get_simulation(simulation_id: str) -> Optional[Dict[str, Any]]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    # First get the column names to ensure we map data correctly
+    cursor.execute('PRAGMA table_info(simulations)')
+    columns = [col[1] for col in cursor.fetchall()]
+    
     cursor.execute('SELECT * FROM simulations WHERE id = ?', (simulation_id,))
     row = cursor.fetchone()
     
@@ -475,15 +512,25 @@ def get_simulation(simulation_id: str) -> Optional[Dict[str, Any]]:
     if row is None:
         return None
     
-    return {
-        'id': row[0],
-        'timestamp': row[1],
-        'context_id': row[2],
-        'interaction_type': row[3],
-        'entity_ids': json.loads(row[4]),
-        'content': row[5],
-        'metadata': json.loads(row[6]) if row[6] else None
-    }
+    # Create a dictionary mapping column names to values
+    simulation = {}
+    for i, column in enumerate(columns):
+        if i < len(row):  # Ensure we don't go out of bounds
+            if column == 'entity_ids':
+                simulation[column] = json.loads(row[i]) if row[i] else []
+            elif column == 'metadata':
+                simulation[column] = json.loads(row[i]) if row[i] else None
+            elif column == 'final_turn_number':
+                try:
+                    simulation[column] = int(row[i]) if row[i] is not None else 0
+                except (ValueError, TypeError):
+                    logger = logging.getLogger('app')
+                    logger.warning(f"Invalid final_turn_number value for simulation {simulation_id}: {row[i]}")
+                    simulation[column] = 0
+            else:
+                simulation[column] = row[i]
+    
+    return simulation
 
 
 def get_all_simulations() -> List[Dict[str, Any]]:
@@ -510,7 +557,8 @@ def get_all_simulations() -> List[Dict[str, Any]]:
             'interaction_type': row[3],
             'entity_ids': json.loads(row[4]),
             'content': row[5],
-            'metadata': json.loads(row[6]) if row[6] else None
+            'metadata': json.loads(row[6]) if row[6] else None,
+            'final_turn_number': row[7]
         })
     
     return simulations
@@ -602,4 +650,203 @@ def delete_entities_by_type(entity_type_id: str) -> int:
         conn.rollback()
         return 0
     finally:
-        conn.close() 
+        conn.close()
+
+
+def update_simulation(
+    simulation_id: str,
+    content: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    final_turn_number: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Update a simulation with new content, metadata, or final_turn_number.
+    
+    Args:
+        simulation_id: ID of the simulation to update
+        content: New content (optional)
+        metadata: New metadata to merge (optional)
+        final_turn_number: New final turn number (optional)
+        
+    Returns:
+        The updated simulation as a dictionary
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Get the column names to ensure we map data correctly
+    cursor.execute('PRAGMA table_info(simulations)')
+    columns = [col[1] for col in cursor.fetchall()]
+
+    # Check if final_turn_number column exists
+    has_final_turn_column = 'final_turn_number' in columns
+    
+    # Get the current simulation
+    cursor.execute('SELECT * FROM simulations WHERE id = ?', (simulation_id,))
+    row = cursor.fetchone()
+    
+    if not row:
+        conn.close()
+        return None
+    
+    # Create a dictionary mapping column names to values
+    current_simulation = {}
+    for i, column in enumerate(columns):
+        if i < len(row):  # Ensure we don't go out of bounds
+            if column == 'entity_ids' or column == 'metadata':
+                current_simulation[column] = json.loads(row[i]) if row[i] else {}
+            elif column == 'final_turn_number':
+                try:
+                    current_simulation[column] = int(row[i]) if row[i] is not None else 0
+                except (ValueError, TypeError):
+                    current_simulation[column] = 0
+            else:
+                current_simulation[column] = row[i]
+    
+    # Update metadata if provided, otherwise keep existing
+    existing_metadata = current_simulation.get('metadata', {}) or {}
+    updated_metadata = {**existing_metadata, **(metadata or {})}
+    
+    # Update final_turn_number if provided, otherwise keep existing
+    new_final_turn_number = final_turn_number
+    if final_turn_number is None and has_final_turn_column:
+        new_final_turn_number = current_simulation.get('final_turn_number', 0)
+    
+    # Update content if provided, otherwise keep existing
+    new_content = content
+    if content is None:
+        new_content = current_simulation.get('content', '')
+    
+    # Update the simulation
+    if has_final_turn_column:
+        cursor.execute(
+            'UPDATE simulations SET content = ?, metadata = ?, final_turn_number = ? WHERE id = ?',
+            (new_content, json.dumps(updated_metadata), new_final_turn_number, simulation_id)
+        )
+    else:
+        cursor.execute(
+            'UPDATE simulations SET content = ?, metadata = ? WHERE id = ?',
+            (new_content, json.dumps(updated_metadata), simulation_id)
+        )
+    
+    conn.commit()
+    
+    # Fetch the updated simulation
+    cursor.execute('SELECT * FROM simulations WHERE id = ?', (simulation_id,))
+    updated_row = cursor.fetchone()
+    
+    conn.close()
+    
+    if not updated_row:
+        return None
+    
+    # Create a dictionary for the updated simulation
+    updated_simulation = {}
+    for i, column in enumerate(columns):
+        if i < len(updated_row):  # Ensure we don't go out of bounds
+            if column == 'entity_ids':
+                updated_simulation[column] = json.loads(updated_row[i]) if updated_row[i] else []
+            elif column == 'metadata':
+                updated_simulation[column] = json.loads(updated_row[i]) if updated_row[i] else None
+            elif column == 'final_turn_number':
+                try:
+                    updated_simulation[column] = int(updated_row[i]) if updated_row[i] is not None else 0
+                except (ValueError, TypeError):
+                    updated_simulation[column] = 0
+            else:
+                updated_simulation[column] = updated_row[i]
+    
+    # Ensure API compatibility with old code
+    if 'content' in updated_simulation and 'result' not in updated_simulation:
+        updated_simulation['result'] = updated_simulation['content']
+    
+    return updated_simulation
+
+
+def get_simulations(
+    entity_id: Optional[str] = None,
+    entity_type_id: Optional[str] = None,
+    interaction_type: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0
+) -> List[Dict[str, Any]]:
+    """
+    Get a list of simulations with optional filtering.
+    
+    Args:
+        entity_id: Filter by entity ID
+        entity_type_id: Filter by entity type ID
+        interaction_type: Filter by interaction type (solo, dyadic, group)
+        limit: Maximum number of simulations to return
+        offset: Number of simulations to skip for pagination
+        
+    Returns:
+        List of simulation dictionaries
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    query_parts = ['SELECT * FROM simulations']
+    params = []
+    where_clauses = []
+    
+    # Apply filters
+    if interaction_type:
+        where_clauses.append('interaction_type = ?')
+        params.append(interaction_type)
+    
+    if entity_id or entity_type_id:
+        # We need to join with entities table for these filters
+        if entity_id:
+            # Filter by entity ID - need to check JSON entity_ids field
+            where_clauses.append("entity_ids LIKE ?")
+            params.append(f'%"{entity_id}"%')
+        
+        if entity_type_id:
+            # Get all entity IDs of this type
+            cursor.execute(
+                'SELECT id FROM entities WHERE entity_type_id = ?',
+                (entity_type_id,)
+            )
+            type_entity_ids = [row[0] for row in cursor.fetchall()]
+            
+            # Build a complex WHERE clause to check if any of these IDs are in the entity_ids JSON
+            if type_entity_ids:
+                type_where = []
+                for type_entity_id in type_entity_ids:
+                    type_where.append("entity_ids LIKE ?")
+                    params.append(f'%"{type_entity_id}"%')
+                
+                where_clauses.append(f"({' OR '.join(type_where)})")
+    
+    # Add WHERE clause if needed
+    if where_clauses:
+        query_parts.append(f"WHERE {' AND '.join(where_clauses)}")
+    
+    # Add ORDER BY, LIMIT, and OFFSET
+    query_parts.append('ORDER BY timestamp DESC')
+    query_parts.append('LIMIT ? OFFSET ?')
+    params.append(limit)
+    params.append(offset)
+    
+    # Execute the query
+    query = ' '.join(query_parts)
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    
+    # Convert rows to dictionaries
+    simulations = []
+    for row in rows:
+        simulations.append({
+            'id': row[0],
+            'created_at': row[1],
+            'context_id': row[2],
+            'interaction_type': row[3],
+            'entity_ids': json.loads(row[4]),
+            'result': row[5],
+            'metadata': json.loads(row[6]) if row[6] else None,
+            'final_turn_number': row[7]
+        })
+    
+    conn.close()
+    return simulations 

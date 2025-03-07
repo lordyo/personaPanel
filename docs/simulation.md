@@ -190,3 +190,186 @@ The simulation system roadmap includes:
 2. **Frontend Integration**: Enhanced UI for configuring and viewing simulations
 3. **Performance Optimization**: Caching and parallel processing improvements
 4. **Extended Entity Templates**: More diverse entity archetypes for varied simulations 
+
+## API Integration
+
+The simulation system includes a complete REST API for creating, retrieving, and continuing simulations through the unified simulation framework. This API allows for seamless integration with frontend applications and third-party systems.
+
+### Unified Simulation API Endpoints
+
+#### Create a Simulation
+
+```
+POST /api/unified-simulations
+```
+
+Creates a new simulation using the unified simulation architecture that works with any number of entities.
+
+**Request body:**
+```json
+{
+  "context": "Detailed description of the situation or environment",
+  "entities": ["entity-id-1", "entity-id-2", "entity-id-3"],
+  "n_turns": 2,
+  "simulation_rounds": 1,
+  "metadata": {
+    "category": "politics",
+    "tags": ["debate", "controversial"]
+  }
+}
+```
+
+**Parameters:**
+- `context`: The situation or environment description
+- `entities`: Array of entity IDs to include (1 or more)
+- `n_turns`: Number of dialogue turns to generate in each round (default: 1)
+- `simulation_rounds`: Number of sequential LLM calls to make (default: 1)
+- `last_turn_number`: The last turn number for continuations (optional)
+- `previous_interaction`: Previous interaction content for continuations (optional)
+- `metadata`: Optional additional information
+
+**Response:**
+```json
+{
+  "id": "sim-20240307-1234",
+  "context_id": "ctx-20240307-1234",
+  "result": "TURN 1\nEntity A: *internal thoughts*\n\"Spoken dialogue\"\n...",
+  "interaction_type": "group",
+  "entity_count": 3,
+  "final_turn_number": 2
+}
+```
+
+#### Retrieve a Simulation
+
+```
+GET /api/unified-simulations/{simulation_id}
+```
+
+Retrieves a simulation by its ID.
+
+**Response:**
+```json
+{
+  "id": "sim-20240307-1234",
+  "context": "Detailed description of the situation",
+  "context_id": "ctx-20240307-1234",
+  "interaction_type": "group",
+  "result": "TURN 1\nEntity A: *internal thoughts*\n\"Spoken dialogue\"\n...",
+  "entities": [
+    {
+      "id": "entity-id-1",
+      "name": "Entity A",
+      "description": "Description of Entity A"
+    },
+    ...
+  ],
+  "created_at": "2024-03-07T12:34:56Z",
+  "metadata": { ... },
+  "final_turn_number": 2
+}
+```
+
+#### Continue a Simulation
+
+```
+POST /api/unified-simulations/{simulation_id}/continue
+```
+
+Continues an existing simulation with additional turns.
+
+**Request body:**
+```json
+{
+  "n_turns": 1,
+  "simulation_rounds": 1
+}
+```
+
+**Parameters:**
+- `n_turns`: Number of dialogue turns to generate in each round (default: 1)
+- `simulation_rounds`: Number of sequential LLM calls to make (default: 1)
+
+**Response:**
+```json
+{
+  "id": "sim-20240307-1234",
+  "context_id": "ctx-20240307-1234",
+  "result": "TURN 1\n...\nTURN 2\n...\nTURN 3\n...",
+  "interaction_type": "group",
+  "entity_count": 3,
+  "final_turn_number": 3
+}
+```
+
+#### List Simulations
+
+```
+GET /api/unified-simulations
+```
+
+Retrieves a list of simulations, with optional filtering.
+
+**Query parameters:**
+- `entity_id`: Filter by entity ID
+- `entity_type_id`: Filter by entity type ID
+- `interaction_type`: Filter by interaction type (solo, dyadic, group)
+- `limit`: Maximum number of simulations to return (default: 20)
+- `offset`: Number of simulations to skip (for pagination)
+
+**Response:**
+```json
+[
+  {
+    "id": "sim-20240307-1234",
+    "context_id": "ctx-20240307-1234",
+    "context": "Detailed description of the situation",
+    "interaction_type": "group",
+    "entity_ids": ["entity-id-1", "entity-id-2", "entity-id-3"],
+    "entity_names": ["Entity A", "Entity B", "Entity C"],
+    "created_at": "2024-03-07T12:34:56Z",
+    "summary": "Optional summary of the simulation"
+  },
+  ...
+]
+```
+
+### Database Storage and Reliability
+
+The simulation system uses SQLite for persistent storage of simulation data. Key implementation details:
+
+1. **Database Schema**: The simulations table includes:
+   - `id`: Unique identifier for the simulation
+   - `timestamp`: Creation time
+   - `context_id`: Reference to the context
+   - `interaction_type`: Type of interaction (solo, dyadic, group)
+   - `entity_ids`: JSON array of entity IDs
+   - `content`: The simulation content
+   - `metadata`: Additional info as JSON
+   - `final_turn_number`: The last turn number of the simulation
+
+2. **Final Turn Number Tracking**: 
+   - Each simulation keeps track of the latest turn number through the `final_turn_number` field
+   - This enables seamless continuation of simulations across multiple API calls
+   - When continuing a simulation, the system retrieves this value to ensure proper sequencing
+
+3. **Robust Error Handling**:
+   - The API implements comprehensive error handling for database schema variations
+   - If the `final_turn_number` column is missing (in older database versions), the system falls back to extracting the turn number from the content
+   - Missing values are handled gracefully with appropriate defaults
+
+4. **Dynamic Column Handling**:
+   - The storage layer dynamically retrieves column information instead of relying on fixed indices
+   - This ensures compatibility with different database schema versions
+   - All database operations validate data before storage or retrieval
+
+### Testing the API
+
+A test script is provided at `backend/test_unified_api.sh` to validate the API functionality. To run the tests:
+
+```bash
+cd backend
+./test_unified_api.sh
+```
+
+This script tests creating, retrieving, continuing, and listing simulations using the unified API. 
