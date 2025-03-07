@@ -2,11 +2,11 @@
 
 ## Overview
 
-The PersonaPanel simulation system provides a flexible framework for simulating interactions between virtual entities. Using a streamlined architecture powered by DSPy and Large Language Models (LLMs), the system can generate realistic dialogues between one or more entities in defined contexts.
+The PersonaPanel simulation system provides a flexible framework for simulating interactions between virtual entities. Using a streamlined architecture powered by DSPy and Large Language Models (LLMs), the system can generate realistic dialogues between any number of entities in defined contexts.
 
 ## Core Architecture
 
-The simulation system is built around a unified approach that handles any number of entities (solo, dyadic, or group) through a single consistent interface. Key concepts include:
+The simulation system is built around a unified approach that handles any number of entities through a single consistent interface. Key concepts include:
 
 - **Entities**: Virtual personas with defined characteristics, personalities, and attributes
 - **Context**: The situation or environment in which entities interact
@@ -72,6 +72,9 @@ The simulation system is organized across several directories:
 - `data/simulation_results/`: Simulation output and results
 - `data/test_results/`: Test output files
 - `data/archived_results/`: Archive of previous simulation runs
+- `frontend/src/pages/`: Frontend components for simulation UI
+- `frontend/src/components/`: Reusable UI components
+- `frontend/src/services/`: API client services
 
 ## Technical Implementation
 
@@ -182,15 +185,6 @@ Victoria Reynolds: *He's idealistic but missing the practical realities of busin
 "While I appreciate the sentiment, in the corporate world we need measurable results..."
 ```
 
-## Future Development
-
-The simulation system roadmap includes:
-
-1. **API Integration**: Exposing simulation capabilities through REST API
-2. **Frontend Integration**: Enhanced UI for configuring and viewing simulations
-3. **Performance Optimization**: Caching and parallel processing improvements
-4. **Extended Entity Templates**: More diverse entity archetypes for varied simulations 
-
 ## API Integration
 
 The simulation system includes a complete REST API for creating, retrieving, and continuing simulations through the unified simulation framework. This API allows for seamless integration with frontend applications and third-party systems.
@@ -234,7 +228,6 @@ Creates a new simulation using the unified simulation architecture that works wi
   "id": "sim-20240307-1234",
   "context_id": "ctx-20240307-1234",
   "result": "TURN 1\nEntity A: *internal thoughts*\n\"Spoken dialogue\"\n...",
-  "interaction_type": "group",
   "entity_count": 3,
   "final_turn_number": 2
 }
@@ -254,7 +247,6 @@ Retrieves a simulation by its ID.
   "id": "sim-20240307-1234",
   "context": "Detailed description of the situation",
   "context_id": "ctx-20240307-1234",
-  "interaction_type": "group",
   "result": "TURN 1\nEntity A: *internal thoughts*\n\"Spoken dialogue\"\n...",
   "entities": [
     {
@@ -296,7 +288,6 @@ Continues an existing simulation with additional turns.
   "id": "sim-20240307-1234",
   "context_id": "ctx-20240307-1234",
   "result": "TURN 1\n...\nTURN 2\n...\nTURN 3\n...",
-  "interaction_type": "group",
   "entity_count": 3,
   "final_turn_number": 3
 }
@@ -313,7 +304,6 @@ Retrieves a list of simulations, with optional filtering.
 **Query parameters:**
 - `entity_id`: Filter by entity ID
 - `entity_type_id`: Filter by entity type ID
-- `interaction_type`: Filter by interaction type (solo, dyadic, group)
 - `limit`: Maximum number of simulations to return (default: 20)
 - `offset`: Number of simulations to skip (for pagination)
 
@@ -324,7 +314,6 @@ Retrieves a list of simulations, with optional filtering.
     "id": "sim-20240307-1234",
     "context_id": "ctx-20240307-1234",
     "context": "Detailed description of the situation",
-    "interaction_type": "group",
     "entity_ids": ["entity-id-1", "entity-id-2", "entity-id-3"],
     "entity_names": ["Entity A", "Entity B", "Entity C"],
     "created_at": "2024-03-07T12:34:56Z",
@@ -334,7 +323,67 @@ Retrieves a list of simulations, with optional filtering.
 ]
 ```
 
-### Database Storage and Reliability
+## Frontend Implementation
+
+The simulation system includes a comprehensive frontend implementation that provides an intuitive user interface for creating, viewing, and continuing simulations. The frontend components are built using modern web technologies and communicate with the backend through the unified simulation API.
+
+### Key Frontend Components
+
+#### SimulationList
+
+The `SimulationList` component displays all available simulations in a card-based interface. Each card shows essential information about the simulation:
+
+- Simulation name or ID
+- Creation date
+- Number of entities involved
+- Current turn number
+- Context snippet
+
+Users can filter and paginate through simulations, and select individual simulations to view details or continue them.
+
+#### SimulationCreate
+
+The `SimulationCreate` component provides an interface for creating new simulations or continuing existing ones:
+
+- Context definition: A text area for describing the situation
+- Entity selection: A multi-select interface for choosing entities
+- Parameter configuration: Settings for turns per round and simulation rounds
+- Validation: Ensures that all required parameters are provided
+
+For continuations, the component pre-fills relevant fields and ensures context consistency.
+
+#### SimulationDetail
+
+The `SimulationDetail` component displays the complete information about a simulation:
+
+- Context and metadata panel
+- Entity information with key attributes
+- Turn-by-turn dialogue display with formatting for inner thoughts and spoken dialogue
+- Continuation controls for extending simulations with additional turns
+
+The component also provides a dialogue interface for configuring continuation parameters.
+
+### API Integration
+
+The frontend components integrate with the unified simulation API through a client service that handles:
+
+- Authentication and error handling
+- Data formatting and parsing
+- Loading state management
+- Continuation tracking
+
+The API client abstracts the underlying HTTP requests and provides a clean interface for components to use.
+
+### Frontend Features
+
+- **Responsive Design**: Components adapt to different screen sizes
+- **Loading States**: Provides feedback during API operations
+- **Error Handling**: Displays user-friendly error messages
+- **Pagination**: Supports browsing through large sets of simulations
+- **Real-time Updates**: Refreshes data after operations are completed
+- **Continuation Tracking**: Maintains state between simulation rounds
+
+## Database Storage and Reliability
 
 The simulation system uses SQLite for persistent storage of simulation data. Key implementation details:
 
@@ -342,7 +391,6 @@ The simulation system uses SQLite for persistent storage of simulation data. Key
    - `id`: Unique identifier for the simulation
    - `timestamp`: Creation time
    - `context_id`: Reference to the context
-   - `interaction_type`: Type of interaction (solo, dyadic, group)
    - `entity_ids`: JSON array of entity IDs
    - `content`: The simulation content
    - `metadata`: Additional info as JSON
@@ -373,3 +421,13 @@ cd backend
 ```
 
 This script tests creating, retrieving, continuing, and listing simulations using the unified API. 
+
+## Future Development
+
+The simulation system roadmap includes:
+
+1. **Performance Optimization**: Caching and parallel processing improvements
+2. **Extended Entity Templates**: More diverse entity archetypes for varied simulations
+3. **Advanced Filtering**: Enhanced search capabilities for simulations
+4. **Simulation Comparisons**: Tools for comparing different simulation outcomes
+5. **Analytics Dashboard**: Visual representations of simulation statistics 
