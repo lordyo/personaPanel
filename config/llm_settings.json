@@ -1,6 +1,6 @@
 {
   "model_settings": {
-    "model": "gpt-4o",
+    "model": "gpt-4o-mini",
     "temperature": 2,
     "max_tokens": 1000,
     "cache": false,

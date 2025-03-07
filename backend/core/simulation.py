@@ -10,11 +10,7 @@ from enum import Enum
 import uuid
 import datetime
 import logging
-from llm.simulation_modules import (
-    SoloInteractionSimulator,
-    DyadicInteractionSimulator,
-    GroupInteractionSimulator
-)
+from llm.interaction_module import InteractionSimulator, LLMError
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -75,9 +71,7 @@ class SimulationEngine:
     
     def __init__(self):
         """Initialize the simulation engine."""
-        self.solo_simulator = SoloInteractionSimulator()
-        self.dyadic_simulator = DyadicInteractionSimulator()
-        self.group_simulator = GroupInteractionSimulator()
+        self.simulator = InteractionSimulator()
     
     def create_context(self, description: str, metadata: Optional[Dict[str, Any]] = None) -> Context:
         """
@@ -134,54 +128,25 @@ class SimulationEngine:
             )
         
         try:
-            if interaction_type == InteractionType.SOLO:
-                if len(entities) != 1:
-                    raise ValueError("Solo interaction requires exactly one entity")
-                
-                # Use the solo interaction simulator
-                result = self.solo_simulator(
-                    entity=entities[0],
-                    context=context.description,
-                    n_rounds=n_rounds,
-                    last_round_number=last_round_number,
-                    previous_interaction=previous_interaction
-                )
-                content = result.content
-                final_round_number = getattr(result, 'final_round_number', last_round_number + n_rounds)
-                
-            elif interaction_type == InteractionType.DYADIC:
-                if len(entities) != 2:
-                    raise ValueError("Dyadic interaction requires exactly two entities")
-                
-                # Use the dyadic interaction simulator
-                result = self.dyadic_simulator(
-                    entity1=entities[0],
-                    entity2=entities[1],
-                    context=context.description,
-                    n_rounds=n_rounds,
-                    last_round_number=last_round_number,
-                    previous_interaction=previous_interaction
-                )
-                content = result.content
-                final_round_number = getattr(result, 'final_round_number', last_round_number + n_rounds)
-                
-            elif interaction_type == InteractionType.GROUP:
-                if len(entities) < 2:
-                    raise ValueError("Group interaction requires at least two entities")
-                
-                # Use the group interaction simulator
-                result = self.group_simulator(
-                    entities=entities,
-                    context=context.description,
-                    n_rounds=n_rounds,
-                    last_round_number=last_round_number,
-                    previous_interaction=previous_interaction
-                )
-                content = result.content
-                final_round_number = getattr(result, 'final_round_number', last_round_number + n_rounds)
+            # Validate entity count based on interaction type
+            if interaction_type == InteractionType.SOLO and len(entities) != 1:
+                raise ValueError("Solo interaction requires exactly one entity")
+            elif interaction_type == InteractionType.DYADIC and len(entities) != 2:
+                raise ValueError("Dyadic interaction requires exactly two entities")
+            elif interaction_type == InteractionType.GROUP and len(entities) < 2:
+                raise ValueError("Group interaction requires at least two entities")
             
-            else:
-                raise ValueError(f"Unknown interaction type: {interaction_type}")
+            # Use the unified interaction simulator for all interaction types
+            result = self.simulator.forward(
+                entities=entities,
+                context=context.description,
+                n_turns=n_rounds,
+                last_turn_number=last_round_number,
+                previous_interaction=previous_interaction
+            )
+            
+            content = result.content
+            final_round_number = getattr(result, 'final_turn_number', last_round_number + n_rounds)
         
         except Exception as e:
             logger.error(f"Error in simulation: {str(e)}")

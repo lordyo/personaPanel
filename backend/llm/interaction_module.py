@@ -62,7 +62,7 @@ def format_entity_for_prompt(entity):
     return formatted
 
 class InteractionSignature(dspy.Signature):
-    """Generate dialogue among 1-n entities in a specific context with multiple turns of interaction."""
+    """Generate interactions among 1-n entities in a specific context with multiple turns of interaction."""
     
     entities: List[Dict[str, Any]] = dspy.InputField(
         desc="List of entity instances (1 to n), each with attributes including name, description and other traits"

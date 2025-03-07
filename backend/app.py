@@ -29,8 +29,7 @@ from core.simulation import SimulationEngine, Context, InteractionType
 from llm.dspy_modules import EntityGenerator
 import storage as storage
 from core.templates import get_template_names, get_template
-from llm.simulation_modules import SoloInteractionSimulator, DyadicInteractionSimulator, GroupInteractionSimulator, LLMError
-from llm.interaction_module import InteractionSimulator
+from llm.interaction_module import InteractionSimulator, LLMError
 from llm.entity_type_generator import generate_entity_type_dimensions
 
 # Create logs directory if it doesn't exist
@@ -714,41 +713,18 @@ def create_simulation():
     # Create context
     context_id = storage.save_context(context_desc, metadata)
     
-    # Run simulation based on interaction type
-    if interaction_type == 'solo':
-        simulator = SoloInteractionSimulator()
-        prediction = simulator.forward(
-            entities[0], 
-            context_desc, 
-            n_rounds=n_rounds,
-            last_round_number=last_round_number,
-            previous_interaction=previous_interaction
-        )
-        # Extract the content from the prediction
-        result = prediction.content
-    elif interaction_type == 'dyadic':
-        simulator = DyadicInteractionSimulator()
-        prediction = simulator.forward(
-            entities[0], 
-            entities[1], 
-            context_desc,
-            n_rounds=n_rounds,
-            last_round_number=last_round_number,
-            previous_interaction=previous_interaction
-        )
-        # Extract the content from the prediction
-        result = prediction.content
-    else:  # group
-        simulator = GroupInteractionSimulator()
-        prediction = simulator.forward(
-            entities, 
-            context_desc,
-            n_rounds=n_rounds,
-            last_round_number=last_round_number,
-            previous_interaction=previous_interaction
-        )
-        # Extract the content from the prediction
-        result = prediction.content
+    # Use unified InteractionSimulator for all interaction types
+    simulator = InteractionSimulator()
+    prediction = simulator.forward(
+        entities=entities,
+        context=context_desc,
+        n_turns=n_rounds,
+        last_turn_number=last_round_number,
+        previous_interaction=previous_interaction
+    )
+    
+    # Extract the content from the prediction
+    result = prediction.content
     
     # Save simulation result
     simulation_id = storage.save_simulation(
