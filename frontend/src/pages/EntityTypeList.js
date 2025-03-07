@@ -23,8 +23,11 @@ const EntityTypeList = () => {
   useEffect(() => {
     // Fetch entity types
     const fetchEntityTypes = async () => {
+      setIsLoading(true);
       try {
+        console.log("Fetching entity types...");
         const response = await entityTypeApi.getAll();
+        console.log("Entity types response:", response);
         if (response && response.status === 'success') {
           setEntityTypes(response.data || []);
           setError(null);
@@ -35,29 +38,31 @@ const EntityTypeList = () => {
         }
       } catch (err) {
         console.error("Error fetching entity types:", err);
-        setError("Failed to load entity types. Please try again later.");
+        setError(`Failed to load entity types: ${err.message || 'Please try again later.'}`);
         setEntityTypes([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     // Fetch templates
     const fetchTemplates = async () => {
+      setIsLoading(true);
       try {
+        console.log("Fetching templates...");
         const response = await templateApi.getAll();
+        console.log("Templates response:", response);
         if (response && response.status === 'success') {
           setTemplates(response.data || []);
           setTemplatesError(null);
         } else {
           console.error('Error fetching templates:', response?.message || 'Unknown error');
-          if (!error) {
-            setError(`Templates: ${response?.message || 'Failed to load data'}`);
-          }
-          setTemplatesError("Unable to load templates. The template service may be unavailable.");
+          setTemplatesError(`Templates: ${response?.message || 'Failed to load data'}`);
           setTemplates([]);
         }
       } catch (err) {
         console.error("Error fetching templates:", err);
-        setTemplatesError("Unable to load templates. The template service may be unavailable.");
+        setTemplatesError(`Failed to load templates: ${err.message || 'Please try again later.'}`);
         setTemplates([]);
       } finally {
         setIsLoading(false);

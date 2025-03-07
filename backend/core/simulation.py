@@ -10,7 +10,7 @@ from enum import Enum
 import uuid
 import datetime
 import logging
-from backend.llm.simulation_modules import (
+from llm.simulation_modules import (
     SoloInteractionSimulator,
     DyadicInteractionSimulator,
     GroupInteractionSimulator

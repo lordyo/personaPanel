@@ -1,0 +1,16 @@
+{
+  "interaction_type": "group",
+  "entity_ids": ["entity-001", "entity-002", "entity-003"],
+  "context": {
+    "description": "A team meeting to discuss the development of a new mental health application. The team needs to identify key features, target audience, and marketing strategy.",
+    "metadata": {
+      "location": "Virtual Meeting Room",
+      "time": "Morning",
+      "atmosphere": "Collaborative and focused"
+    }
+  },
+  "previous_interaction": null,
+  "last_round_number": 0,
+  "n_rounds": 3,
+  "output_filename": "mental_health_app_discussion.json"
+} 

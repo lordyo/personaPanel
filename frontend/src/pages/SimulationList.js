@@ -46,8 +46,25 @@ const SimulationList = () => {
 
   // Format date to a more readable format
   const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    if (!dateString) return 'Unknown date';
+    try {
+      // Some systems return ISO timestamps without the 'T' separator
+      const normalizedDate = dateString.includes('T') ? 
+        dateString : 
+        dateString.replace(/(\d{4}-\d{2}-\d{2})[ ]?(\d{2}:\d{2}:\d{2})/, '$1T$2');
+      
+      const options = { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      };
+      return new Date(normalizedDate).toLocaleDateString(undefined, options);
+    } catch (error) {
+      console.error('Error formatting date:', error, 'Date string was:', dateString);
+      return 'Invalid date format';
+    }
   };
 
   if (loading) {
@@ -105,41 +122,45 @@ const SimulationList = () => {
               <tbody className="divide-y divide-gray-700">
                 {simulations.map((simulation) => (
                   <tr 
-                    key={simulation.id}
+                    key={simulation?.id || `sim-${Math.random()}`}
                     className="hover:bg-gray-750 transition-colors"
                   >
-                    <td className="py-3 px-4 text-gray-300">{simulation.name}</td>
-                    <td className="py-3 px-4 text-gray-300">{formatDate(simulation.created_at)}</td>
+                    <td className="py-3 px-4 text-gray-300">{simulation?.name || 'Unnamed Simulation'}</td>
+                    <td className="py-3 px-4 text-gray-300">{formatDate(simulation?.created_at)}</td>
                     <td className="py-3 px-4 text-gray-300">
-                      {simulation.context.length > 70 
-                        ? `${simulation.context.substring(0, 70)}...` 
-                        : simulation.context}
+                      {simulation?.context ? (
+                        simulation?.context.length > 70 
+                          ? `${simulation?.context.substring(0, 70)}...` 
+                          : simulation?.context
+                      ) : (
+                        <span className="text-gray-500 italic">No context available</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
-                      {simulation.entities.length > 0 ? (
+                      {simulation?.entities && simulation?.entities.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {simulation.entities.slice(0, 3).map((entity, index) => (
+                          {simulation?.entities.slice(0, 3).map((entity, index) => (
                             <span 
                               key={index} 
                               className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded-full"
                             >
-                              {entity.name}
+                              {entity?.name || 'Unnamed Entity'}
                             </span>
                           ))}
-                          {simulation.entities.length > 3 && (
-                            <span className="px-2 py-1 text-xs bg-gray-700 text-gray-500 rounded-full">
-                              +{simulation.entities.length - 3} more
+                          {simulation?.entities.length > 3 && (
+                            <span className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded-full">
+                              +{simulation?.entities.length - 3} more
                             </span>
                           )}
                         </div>
                       ) : (
-                        <span className="text-gray-500">No entities</span>
+                        <span className="text-gray-500 italic">No entities</span>
                       )}
                     </td>
-                    <td className="py-3 px-4">
-                      <button 
-                        onClick={() => handleViewSimulation(simulation.id)}
-                        className="p-1 text-blue-400 hover:text-blue-300 rounded-full hover:bg-blue-900 hover:bg-opacity-20 transition-colors"
+                    <td className="py-3 px-4 flex justify-end space-x-2">
+                      <button
+                        className="p-2 rounded bg-blue-700 text-white hover:bg-blue-600 transition-colors"
+                        onClick={() => handleViewSimulation(simulation?.id)}
                         title="View Details"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
