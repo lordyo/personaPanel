@@ -1,0 +1,6 @@
+{
+  "context": "A panel discussion on 'Finding Balance in Modern Life' at a wellness conference. The panelists come from very different backgrounds and perspectives.",
+  "n_turns": 3,
+  "simulation_rounds": 2,
+  "entity_ids": ["entity-001", "entity-002", "entity-003"]
+} 

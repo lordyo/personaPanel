@@ -1,0 +1,17 @@
+{
+  "id": "52bbf842-02af-4196-a87a-4821ef484296",
+  "timestamp": "2025-03-07T10:13:44.140592",
+  "context_id": "d402786a-3747-4ea1-a603-aea70b40f427",
+  "interaction_type": "dyadic",
+  "entity_ids": [
+    "entity-001",
+    "entity-002"
+  ],
+  "content": "This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.\nContext: A coffee shop on a quiet afternoon. Alex and Morgan are discussing potential collaboration on a new app idea.\n\nThis simulation should include 3 rounds of dialogue, starting from round 1.\nThis is round 1",
+  "metadata": {
+    "last_round_number": 0,
+    "dialogue_turns": 3,
+    "final_round_number": 3,
+    "previous_interaction": null
+  }
+}

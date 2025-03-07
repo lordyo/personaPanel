@@ -1,16 +1,16 @@
 {
-  "id": "321f1783-0bf2-40e7-b673-a6eacc354de2",
-  "timestamp": "2025-03-06T20:55:59.168708",
-  "context_id": "e0d08fa8-ee17-4701-a655-6e835209a46d",
+  "id": "32945e2c-11a0-4033-9061-f76a0e098637",
+  "timestamp": "2025-03-07T10:13:44.140880",
+  "context_id": "5930c150-b0ef-4727-8af9-a1f38e70c58a",
   "interaction_type": "dyadic",
   "entity_ids": [
     "entity-001",
     "entity-002"
   ],
-  "content": "ROUND 1\nAlex Chen: *I need to focus on the user experience. What features can we add that will truly resonate with our audience?*  \n'What if we incorporate a personalized dashboard that adapts to user behavior?'\n\nMorgan Taylor: *That's a great idea! Personalization is key in today's market. But we should also think about how to make it visually appealing.*  \n'How about integrating vibrant graphics and interactive elements to engage users right from the start?'",
+  "content": "This is a placeholder for a dyadic interaction between Alex Chen and Morgan Taylor.\nContext: Two team members discussing UI design for a new app.\nThis is round 1",
   "metadata": {
-    "n_rounds": 1,
     "last_round_number": 0,
+    "dialogue_turns": 1,
     "final_round_number": 1,
     "previous_interaction": null
   }

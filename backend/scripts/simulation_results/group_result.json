@@ -1,17 +1,17 @@
 {
-  "id": "1ad9dbb6-5571-48cb-90e2-30eee0974a4f",
-  "timestamp": "2025-03-06T20:59:26.917770",
-  "context_id": "592772b8-14b2-4e36-9b20-2578c5622a72",
+  "id": "c7da78fe-a05b-4353-9c24-071717f30ee3",
+  "timestamp": "2025-03-07T10:13:09.032190",
+  "context_id": "499cc052-8c16-4594-a241-25dba9e5d4d3",
   "interaction_type": "group",
   "entity_ids": [
     "entity-001",
     "entity-002",
     "entity-003"
   ],
-  "content": "ROUND 1\nAlex Chen: *This is such an intriguing topic. \"Severance\" raises so many questions about work-life balance and identity.* 'I think the concept of separating work and personal life is fascinating, but it also feels a bit dystopian, don\u2019t you think?'\nMorgan Taylor: *I love how \"Severance\" plays with the idea of identity. It\u2019s a brilliant commentary on corporate culture.* 'Absolutely! The way it portrays the extremes of work-life separation makes you wonder about the lengths companies might go to for productivity.'\nJordan Rivera: *I appreciate the psychological implications of the show. It really delves into how our environments shape our mental health.* 'Yes, and it also highlights the importance of self-awareness. The characters\u2019 struggles reflect real issues many people face in their jobs.'\n\nROUND 2\nAlex Chen: *I wonder how the audience perceives the ethical implications of such a technology.* 'Do you think viewers see it as a cautionary tale or just a sci-fi concept?'\nMorgan Taylor: *I believe it resonates with many who feel trapped in their jobs.* 'It\u2019s definitely a cautionary tale! The way it exaggerates the consequences of extreme corporate control makes it relatable to anyone who\u2019s ever felt overworked.'\nJordan Rivera: *The emotional toll on the characters is significant. It\u2019s a reminder of the importance of mental health in the workplace.* 'Exactly. The show encourages conversations about mental health and the need for supportive work environments.'",
+  "content": "This is a placeholder for a group interaction between Alex Chen, Morgan Taylor, Jordan Rivera.\nContext: You are on stage of a panel discussion at a local Comic Con. You have been given the topic of the first season of \"Severance\".\n\nThis simulation should include 2 rounds of dialogue, starting from round 1.\nThis is round 1",
   "metadata": {
-    "n_rounds": 2,
     "last_round_number": 0,
+    "dialogue_turns": 2,
     "final_round_number": 2,
     "previous_interaction": null
   }

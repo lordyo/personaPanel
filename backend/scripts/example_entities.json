@@ -1,0 +1,58 @@
+{
+  "entities": [
+    {
+      "id": "entity-001",
+      "type_id": "monk",
+      "name": "Tenzin Dorje",
+      "description": "A Tibetan monk who has spent 25 years in meditation and contemplation. He speaks slowly but with profound insight, often drawing on Buddhist teachings. He has traveled to the West to share ancient wisdom in modern contexts.",
+      "attributes": {
+        "extraversion": 0.3,
+        "agreeableness": 0.9,
+        "conscientiousness": 0.8,
+        "neuroticism": 0.1,
+        "openness": 0.7,
+        "compassion": 0.95,
+        "wisdom": 0.9,
+        "patience": 0.9,
+        "worldliness": 0.4,
+        "spirituality": 0.95
+      }
+    },
+    {
+      "id": "entity-002",
+      "type_id": "executive",
+      "name": "Victoria Reynolds",
+      "description": "A powerful tech CEO who built her company from scratch into a Fortune 500 corporation. She's known for her direct, no-nonsense approach and strategic vision. Her time is extremely valuable, and she's accustomed to people following her lead without question.",
+      "attributes": {
+        "extraversion": 0.8,
+        "agreeableness": 0.4,
+        "conscientiousness": 0.9,
+        "neuroticism": 0.3,
+        "openness": 0.6,
+        "ambition": 0.95,
+        "leadership": 0.9,
+        "risk_tolerance": 0.7,
+        "patience": 0.3,
+        "empathy": 0.5
+      }
+    },
+    {
+      "id": "entity-003",
+      "type_id": "gardener",
+      "name": "Walter Simmons",
+      "description": "A retired gardener who spent 40 years tending to public parks. He has a deep connection to nature and speaks with homespun wisdom. Walter enjoys sharing stories from his life and offering gentle advice based on his experiences with plants and people.",
+      "attributes": {
+        "extraversion": 0.5,
+        "agreeableness": 0.8,
+        "conscientiousness": 0.7,
+        "neuroticism": 0.2,
+        "openness": 0.6,
+        "patience": 0.9,
+        "practicality": 0.8,
+        "creativity": 0.7,
+        "environmental_awareness": 0.95,
+        "storytelling": 0.85
+      }
+    }
+  ]
+} 

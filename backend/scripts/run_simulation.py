@@ -1,30 +1,26 @@
 #!/usr/bin/env python3
 """
-Simulation Runner Script.
+Simulation runner for entity interactions.
 
-This script runs simulations based on JSON configuration files.
+This script loads entity and simulation configurations from JSON files and
+runs the specified simulation using the InteractionSimulator.
 """
 
 import os
 import sys
 import json
+import uuid
 import argparse
 import logging
-from pathlib import Path
-import datetime
-from dotenv import load_dotenv  # Add dotenv import
-
-# Try to load .env file from project root
-env_path = Path(__file__).resolve().parent.parent.parent / '.env'
-if env_path.exists():
-    print(f"Loading environment variables from {env_path}")
-    load_dotenv(dotenv_path=env_path)
-
-# Add the parent directory to sys.path to import backend modules
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
+from typing import Dict, List, Any, Optional
+from datetime import datetime
 import dspy
-from backend.core.simulation import SimulationEngine, InteractionType, Context, SimulationResult
+from dotenv import load_dotenv
+
+# Add parent directory to path to allow imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from llm.interaction_module import InteractionSimulator
 
 # Configure logging
 logging.basicConfig(
@@ -37,158 +33,201 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def load_config(file_path: str) -> Dict:
+    """Load a configuration file."""
+    try:
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        logger.error(f"Error loading config from {file_path}: {str(e)}")
+        raise
 
-def setup_dspy():
-    """Set up DSPy with OpenAI API key."""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable not set")
+def load_entities(entities_file: str, entity_ids: List[str] = None) -> List[Dict]:
+    """
+    Load entities from a JSON file.
     
-    # Get model name from environment variable or use default
-    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    Args:
+        entities_file: Path to the entities JSON file
+        entity_ids: Optional list of entity IDs to filter by
+        
+    Returns:
+        List of entity dictionaries
+    """
+    entities_config = load_config(entities_file)
     
-    # Set up DSPy with LM using OpenAI
-    lm = dspy.LM(f'openai/{model}', api_key=api_key)
+    if 'entities' not in entities_config:
+        raise ValueError(f"Entities file {entities_file} is missing 'entities' key")
+    
+    entities = entities_config['entities']
+    
+    # Filter entities by ID if specified
+    if entity_ids:
+        filtered_entities = []
+        for entity_id in entity_ids:
+            found = False
+            for entity in entities:
+                if entity.get('id') == entity_id:
+                    filtered_entities.append(entity)
+                    found = True
+                    break
+            if not found:
+                logger.warning(f"Entity with ID {entity_id} not found in entities file")
+        return filtered_entities
+    
+    return entities
+
+def setup_dspy(llm_config=None):
+    """Set up DSPy with the specified LLM configuration."""
+    # Load environment variables if they haven't been loaded already
+    load_dotenv()
+    
+    # If no specific configuration is provided, use environment variables
+    if not llm_config:
+        openai_api_key = os.environ.get('OPENAI_API_KEY')
+        openai_model = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+        
+        if not openai_api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+            
+        llm_config = {
+            'api_key': openai_api_key,
+            'model': openai_model
+        }
+    
+    # Configure DSPy with OpenAI
+    model_string = f"openai/{llm_config['model']}"
+    lm = dspy.LM(model_string, api_key=llm_config['api_key'])
     dspy.configure(lm=lm)
-    logger.info(f"DSPy configured with OpenAI model: {model}")
-
-
-def load_json_file(filepath):
-    """Load a JSON file."""
-    with open(filepath, 'r') as f:
-        return json.load(f)
-
-
-def load_entities(filepath):
-    """Load entity data from a JSON file."""
-    try:
-        return load_json_file(filepath)
-    except Exception as e:
-        logger.error(f"Error loading entities from {filepath}: {str(e)}")
-        raise
-
-
-def load_config(filepath):
-    """Load simulation configuration from a JSON file."""
-    try:
-        return load_json_file(filepath)
-    except Exception as e:
-        logger.error(f"Error loading configuration from {filepath}: {str(e)}")
-        raise
-
-
-def save_result(result, output_dir, filename=None):
-    """Save simulation result to a JSON file."""
-    # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
     
-    # Generate filename if not provided
-    if not filename:
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"simulation_{result.interaction_type}_{timestamp}.json"
+    logger.info(f"DSPy configured with model: {llm_config['model']}")
+
+def run_simulation(
+    entities: List[Dict],
+    context: str,
+    n_turns: int = 1,
+    simulation_rounds: int = 1,
+    output_file: Optional[str] = None
+) -> Dict:
+    """
+    Run a complete simulation with the specified parameters.
     
-    # Convert datetime to string for serialization
-    result_dict = {
-        "id": result.id,
-        "timestamp": result.timestamp.isoformat(),
-        "context_id": result.context_id,
-        "interaction_type": result.interaction_type,
-        "entity_ids": result.entity_ids,
-        "content": result.content,
-        "metadata": result.metadata
+    Args:
+        entities: List of entity dictionaries
+        context: The situation or environment description
+        n_turns: Number of turns per simulation round
+        simulation_rounds: Number of successive LLM calls
+        output_file: Optional path to save the output
+        
+    Returns:
+        Dictionary with simulation results
+    """
+    simulator = InteractionSimulator()
+    
+    # Initial state
+    previous_interaction = None
+    last_turn_number = 0
+    all_content = []
+    
+    # Run each simulation round
+    for round_idx in range(simulation_rounds):
+        logger.info(f"Running simulation round {round_idx+1}/{simulation_rounds}")
+        
+        result = simulator(
+            entities=entities,
+            context=context,
+            n_turns=n_turns,
+            last_turn_number=last_turn_number,
+            previous_interaction=previous_interaction
+        )
+        
+        # Update for next round
+        previous_interaction = result.content
+        last_turn_number = result.final_turn_number
+        all_content.append(result.content)
+    
+    # Combine all content
+    combined_content = "\n\n".join(all_content)
+    
+    # Create result object
+    simulation_result = {
+        "id": str(uuid.uuid4()),
+        "timestamp": datetime.now().isoformat(),
+        "context_id": str(uuid.uuid4()),  # In a real system, this might track the context
+        "interaction_type": "solo" if len(entities) == 1 else "group",
+        "entity_ids": [entity.get('id', 'unknown') for entity in entities],
+        "content": combined_content,
+        "metadata": {
+            "n_turns": n_turns,
+            "last_turn_number": 0,  # Starting point
+            "final_turn_number": last_turn_number,  # End point
+            "simulation_rounds": simulation_rounds,
+            "previous_interaction": None  # No prior interaction at the start
+        }
     }
     
-    filepath = os.path.join(output_dir, filename)
-    with open(filepath, 'w') as f:
-        json.dump(result_dict, f, indent=2)
+    # Save to file if specified
+    if output_file:
+        os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+        with open(output_file, 'w') as f:
+            json.dump(simulation_result, f, indent=2)
+        logger.info(f"Saved result to {output_file}")
     
-    logger.info(f"Saved result to {filepath}")
-    return filepath
-
-
-def run_simulation_from_config(config, entities, output_dir):
-    """Run a simulation based on a configuration."""
-    logger.info(f"Running {config['interaction_type']} simulation")
-    
-    # Create simulation engine
-    engine = SimulationEngine()
-    
-    # Create context
-    context = engine.create_context(
-        description=config['context']['description'],
-        metadata=config['context'].get('metadata', {})
-    )
-    
-    # Get entity data
-    entity_ids = config['entity_ids']
-    simulation_entities = []
-    
-    for entity_id in entity_ids:
-        # Find entity by ID
-        entity = next((e for e in entities if e.get('id') == entity_id), None)
-        if not entity:
-            raise ValueError(f"Entity with ID {entity_id} not found in the provided entities")
-        simulation_entities.append(entity)
-    
-    # Get interaction type
-    interaction_type_str = config['interaction_type'].upper()
-    try:
-        interaction_type = InteractionType[interaction_type_str]
-    except KeyError:
-        raise ValueError(f"Unknown interaction type: {config['interaction_type']}")
-    
-    # Get previous interaction if provided
-    previous_interaction = config.get('previous_interaction')
-    
-    # Run simulation
-    result = engine.run_simulation(
-        context=context,
-        entities=simulation_entities,
-        interaction_type=interaction_type,
-        previous_interaction=previous_interaction
-    )
-    
-    # Save result
-    output_filename = config.get('output_filename')
-    filepath = save_result(result, output_dir, output_filename)
-    
-    return result, filepath
-
+    return simulation_result
 
 def main():
-    """Run the simulation from command line arguments."""
-    parser = argparse.ArgumentParser(description='Run a simulation based on JSON configuration')
-    parser.add_argument('--config', required=True, help='Path to the simulation configuration file')
-    parser.add_argument('--entities', required=True, help='Path to the entities data file')
-    parser.add_argument('--output-dir', default='simulation_results', help='Directory to save output')
-    
+    """Main entry point."""
+    parser = argparse.ArgumentParser(description="Run entity simulations")
+    parser.add_argument('--entities', type=str, default='config/example_entities.json',
+                        help='Path to entities configuration file')
+    parser.add_argument('--config', type=str, default='config/example_simulation.json',
+                        help='Path to simulation configuration file')
+    parser.add_argument('--output-dir', type=str, default='data/simulation_results',
+                        help='Directory to save simulation results')
     args = parser.parse_args()
     
-    try:
-        # Setup DSPy
-        setup_dspy()
-        
-        # Load entities and configuration
-        entities = load_entities(args.entities)
-        config = load_config(args.config)
-        
-        # Run simulation
-        result, filepath = run_simulation_from_config(config, entities, args.output_dir)
-        
-        # Display success message
-        print(f"\nSimulation completed successfully. Result saved to: {filepath}")
-        
-        # Display a preview of the content
-        print("\nContent preview:")
-        preview_length = 200
-        content_preview = result.content[:preview_length] + "..." if len(result.content) > preview_length else result.content
-        print(content_preview)
-        
-    except Exception as e:
-        logger.error(f"Error running simulation: {str(e)}", exc_info=True)
-        print(f"Error: {str(e)}")
-        sys.exit(1)
-
+    # Setup DSPy
+    setup_dspy()
+    
+    # Load simulation config
+    sim_config = load_config(args.config)
+    
+    # Extract parameters
+    context = sim_config.get('context', 'A generic conversation')
+    n_turns = sim_config.get('n_turns', 1)
+    simulation_rounds = sim_config.get('simulation_rounds', 1)
+    entity_ids = sim_config.get('entity_ids', [])
+    
+    # Load entities
+    entities = load_entities(args.entities, entity_ids)
+    
+    if not entities:
+        logger.error("No entities found or specified. Cannot run simulation.")
+        return
+    
+    # Create output filename
+    sim_type = "solo" if len(entities) == 1 else "group"
+    entity_names = "_".join([entity.get('name', 'unnamed').split()[0].lower() for entity in entities])
+    output_file = os.path.join(
+        args.output_dir,
+        f"{sim_type}_{entity_names}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
+    
+    # Run simulation
+    logger.info(f"Running {sim_type} simulation with {len(entities)} entities, "
+                f"{n_turns} turns per round, {simulation_rounds} rounds")
+    
+    result = run_simulation(
+        entities=entities,
+        context=context,
+        n_turns=n_turns,
+        simulation_rounds=simulation_rounds,
+        output_file=output_file
+    )
+    
+    # Print a preview of the content
+    content_preview = result['content'][:300] + "..." if len(result['content']) > 300 else result['content']
+    print(f"\nSimulation completed successfully. Result saved to: {output_file}\n")
+    print(f"Content preview:\n{content_preview}\n")
 
 if __name__ == "__main__":
     main() 
