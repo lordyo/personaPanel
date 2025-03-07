@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { simulationApi } from '../services/api';
+import { unifiedSimulationApi } from '../services/api';
 import LoadingIndicator from '../components/LoadingIndicator';
 
 /**
@@ -12,11 +12,18 @@ const SimulationDetail = () => {
   const [simulation, setSimulation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Continue simulation dialog
+  const [continueDialogOpen, setContinueDialogOpen] = useState(false);
+  const [nTurns, setNTurns] = useState(1);
+  const [simulationRounds, setSimulationRounds] = useState(1);
+  const [continuing, setContinuing] = useState(false);
+  const [continueError, setContinueError] = useState(null);
 
   useEffect(() => {
     const fetchSimulation = async () => {
       try {
-        const response = await simulationApi.getById(id);
+        const response = await unifiedSimulationApi.getById(id);
         if (response && response.status === 'success') {
           setSimulation(response.data);
           setError(null);
@@ -40,348 +47,278 @@ const SimulationDetail = () => {
   const handleBack = () => {
     navigate('/simulations');
   };
-
-  const handleDeleteSimulation = async () => {
+  
+  const handleOpenContinueDialog = () => {
+    setContinueDialogOpen(true);
+  };
+  
+  const handleCloseContinueDialog = () => {
+    setContinueDialogOpen(false);
+    setContinueError(null);
+  };
+  
+  const handleContinueSimulation = async () => {
+    if (nTurns < 1 || simulationRounds < 1) {
+      setContinueError("Number of turns and rounds must be at least 1");
+      return;
+    }
+    
+    setContinuing(true);
+    setContinueError(null);
+    
     try {
-      setLoading(true);
-      const response = await simulationApi.delete(id);
+      const continuationOptions = {
+        n_turns: nTurns,
+        simulation_rounds: simulationRounds
+      };
+      
+      const response = await unifiedSimulationApi.continue(id, continuationOptions);
+      
       if (response && response.status === 'success') {
-        navigate('/simulations', { state: { message: 'Simulation deleted successfully' } });
+        // Reload the simulation to get the updated content
+        const updatedSimulation = await unifiedSimulationApi.getById(id);
+        if (updatedSimulation && updatedSimulation.status === 'success') {
+          setSimulation(updatedSimulation.data);
+        }
+        handleCloseContinueDialog();
       } else {
-        console.error('Error deleting simulation:', response?.message || 'Unknown error');
-        setError(response?.message || 'Failed to delete simulation');
-        setLoading(false);
+        setContinueError(response?.message || 'Failed to continue simulation');
       }
     } catch (err) {
-      console.error("Error deleting simulation:", err);
-      setError("Failed to delete simulation. Please try again later.");
-      setLoading(false);
-    }
-  };
-
-  // Format date to a more readable format
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown date';
-    try {
-      // Some systems return ISO timestamps without the 'T' separator
-      const normalizedDate = dateString.includes('T') ? 
-        dateString : 
-        dateString.replace(/(\d{4}-\d{2}-\d{2})[ ]?(\d{2}:\d{2}:\d{2})/, '$1T$2');
-      
-      const options = { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      };
-      return new Date(normalizedDate).toLocaleDateString(undefined, options);
-    } catch (error) {
-      console.error('Error formatting date:', error, 'Date string was:', dateString);
-      return 'Invalid date format';
+      console.error('Error continuing simulation:', err);
+      setContinueError(`Error: ${err.message || 'Failed to continue simulation'}`);
+    } finally {
+      setContinuing(false);
     }
   };
 
   if (loading) {
-    return <LoadingIndicator message="Loading simulation details..." fullPage />;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <LoadingIndicator />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-6 p-4 bg-red-400 bg-opacity-10 border border-red-400 rounded-lg text-red-400">
+          {error}
+        </div>
+        <button 
+          onClick={handleBack}
+          className="border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 py-2 px-4 rounded-md transition-colors"
+        >
+          Back to Simulations
+        </button>
+      </div>
+    );
   }
 
   if (!simulation) {
     return (
       <div className="container mx-auto px-4 py-8">
-        {error && (
-          <div className="mb-6 p-4 bg-red-400 bg-opacity-10 border border-red-400 rounded-lg text-red-400">
-            {error}
-          </div>
-        )}
-        <div className="flex items-center mb-6">
-          <button 
-            onClick={handleBack}
-            className="flex items-center text-blue-400 hover:text-blue-300"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-            Back to Simulations
-          </button>
+        <div className="mb-6 p-4 bg-orange-400 bg-opacity-10 border border-orange-400 rounded-lg text-orange-300">
+          Simulation not found
         </div>
-        <div className="bg-gray-800 p-8 text-center rounded-lg border border-gray-700">
-          <h2 className="text-xl font-semibold text-blue-300 mb-2">Simulation not found</h2>
-          <p className="text-gray-400">The requested simulation could not be loaded.</p>
-        </div>
+        <button 
+          onClick={handleBack}
+          className="border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 py-2 px-4 rounded-md transition-colors"
+        >
+          Back to Simulations
+        </button>
       </div>
     );
   }
 
+  // Format the simulation content for display
+  const formatContent = (content) => {
+    if (!content) return <p className="text-gray-400 italic">No content available</p>;
+    
+    // Process the content based on the structure (assuming it's plain text with TURN markers)
+    return (
+      <div className="whitespace-pre-wrap text-gray-300">
+        {content.split(/\n\n(?=(?:TURN|Turn) \d+:)/).map((turnContent, index) => {
+          // Extract turn number from the heading
+          const turnMatch = turnContent.match(/^(?:TURN|Turn) (\d+):/i);
+          const turnNumber = turnMatch ? turnMatch[1] : index + 1;
+          
+          return (
+            <div 
+              key={index} 
+              className="mb-6 p-4 bg-gray-700 border border-gray-600 rounded-lg"
+            >
+              <div className="font-semibold text-blue-300 mb-2 pb-2 border-b border-gray-600">
+                {turnMatch ? turnContent.split('\n')[0] : `Turn ${turnNumber}`}
+              </div>
+              <div className="whitespace-pre-wrap text-gray-300">
+                {turnMatch ? 
+                  turnContent.split('\n').slice(1).join('\n') : 
+                  turnContent
+                }
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
-      {error && (
-        <div className="mb-6 p-4 bg-red-400 bg-opacity-10 border border-red-400 rounded-lg text-red-400">
-          {error}
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-blue-300">
+            {simulation.name || `Simulation ${simulation.id.slice(0, 8)}`}
+          </h1>
+          <p className="text-gray-400">
+            Created: {new Date(simulation.created_at).toLocaleString()}
+          </p>
         </div>
-      )}
-
-      <div className="flex items-center mb-6">
-        <button 
-          onClick={handleBack}
-          className="flex items-center text-blue-400 hover:text-blue-300"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-          </svg>
-          Back to Simulations
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={handleBack}
+            className="border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 py-2 px-4 rounded-md transition-colors"
+          >
+            Back
+          </button>
+          <button 
+            onClick={handleOpenContinueDialog}
+            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors"
+          >
+            Continue Simulation
+          </button>
+        </div>
       </div>
-
-      <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden mb-8">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-blue-300 mb-2">{simulation?.name || 'Unnamed Simulation'}</h1>
+      
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2">
+            <h2 className="text-xl font-semibold text-blue-300 mb-3">
+              Context
+            </h2>
+            <div className="bg-gray-700 border border-gray-600 rounded-lg p-4 text-gray-300">
+              {simulation.context || "No context available"}
+            </div>
+          </div>
           
-          <div className="flex flex-wrap gap-6 mb-4 text-gray-400">
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-              </svg>
-              <span>{formatDate(simulation?.created_at)}</span>
+          <div>
+            <h2 className="text-xl font-semibold text-blue-300 mb-3">
+              Details
+            </h2>
+            <div className="bg-gray-700 border border-gray-600 rounded-lg p-4">
+              <div className="mb-4">
+                <h3 className="text-gray-300 font-medium mb-1">Entity Count</h3>
+                <p className="text-blue-300">{simulation.entity_ids?.length || 0} entities</p>
+              </div>
+              
+              <div className="mb-4">
+                <h3 className="text-gray-300 font-medium mb-1">Simulation ID</h3>
+                <p className="text-blue-300 text-sm font-mono">{simulation.id}</p>
+              </div>
+              
+              <div>
+                <h3 className="text-gray-300 font-medium mb-1">Entities</h3>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {simulation.entities && simulation.entities.map((entity) => (
+                    <span 
+                      key={entity.id}
+                      className="bg-gray-600 text-gray-300 text-xs font-medium px-2.5 py-1 rounded-full"
+                    >
+                      {entity.name}
+                    </span>
+                  ))}
+                  
+                  {(!simulation.entities || simulation.entities.length === 0) && (
+                    <p className="text-gray-400 text-sm italic">No entity details available</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h2 className="text-xl font-semibold text-blue-300 mb-4">
+          Simulation Content
+        </h2>
+        {formatContent(simulation.result || simulation.content)}
+      </div>
+      
+      {/* Continue Simulation Dialog */}
+      {continueDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg w-full max-w-md p-6">
+            <h3 className="text-xl font-semibold text-blue-300 mb-4">
+              Continue Simulation
+            </h3>
+            
+            {continueError && (
+              <div className="mb-4 p-3 bg-red-400 bg-opacity-10 border border-red-400 rounded-lg text-red-400 text-sm">
+                {continueError}
+              </div>
+            )}
+            
+            <div className="mb-4">
+              <label className="block text-gray-300 text-sm font-medium mb-2" htmlFor="nTurns">
+                Number of Turns
+              </label>
+              <input
+                id="nTurns"
+                type="number"
+                value={nTurns}
+                onChange={(e) => setNTurns(parseInt(e.target.value, 10))}
+                min={1}
+                max={10}
+                className="bg-gray-700 text-white border border-gray-600 rounded-md p-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="mt-1 text-gray-400 text-sm">Number of dialogue turns (1-10)</p>
             </div>
             
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
-              </svg>
-              <span>{simulation?.entities?.length || 0} Entities</span>
+            <div className="mb-6">
+              <label className="block text-gray-300 text-sm font-medium mb-2" htmlFor="simulationRounds">
+                Simulation Rounds
+              </label>
+              <input
+                id="simulationRounds"
+                type="number"
+                value={simulationRounds}
+                onChange={(e) => setSimulationRounds(parseInt(e.target.value, 10))}
+                min={1}
+                max={5}
+                className="bg-gray-700 text-white border border-gray-600 rounded-md p-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="mt-1 text-gray-400 text-sm">Number of sequential LLM calls (1-5)</p>
             </div>
-          </div>
-          
-          <div className="mb-6">
-            <h2 className="text-lg font-medium text-blue-300 mb-2">Context</h2>
-            <p className="text-gray-300 bg-gray-750 p-4 rounded-lg">
-              {typeof simulation?.context === 'string' 
-                ? simulation.context 
-                : (simulation?.context?.description 
-                  ? simulation.context.description 
-                  : JSON.stringify(simulation?.context) || 'No context available')}
-            </p>
-          </div>
-
-          {simulation?.content && (
-            <div className="mt-8">
-              <h2 className="text-lg font-medium text-blue-300 mb-2">Simulation Content</h2>
-              <div className="bg-gray-750 p-4 rounded-lg text-gray-300 whitespace-pre-wrap">
-                {(() => {
-                  try {
-                    const content = simulation.content;
-                    
-                    // Try to parse as JSON if it looks like JSON
-                    if (typeof content === 'string' && 
-                        (content.trim().startsWith('{') || content.trim().startsWith('['))) {
-                      try {
-                        const parsed = JSON.parse(content);
-                        // If it's a dialogue array, format it nicely
-                        if (Array.isArray(parsed)) {
-                          return (
-                            <div className="space-y-4">
-                              {parsed.map((item, idx) => (
-                                <div key={idx} className="border-b border-gray-700 pb-3 mb-3 last:border-0">
-                                  <div className="flex justify-between mb-2">
-                                    <span className="font-bold text-blue-400">{item.speaker || 'Unknown'}</span>
-                                    <span className="text-gray-400 text-sm">{idx + 1}/{parsed.length}</span>
-                                  </div>
-                                  <div className="pl-4 border-l-2 border-gray-700">{item.text || item.content || item.message || JSON.stringify(item)}</div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        } else {
-                          // Otherwise just stringify it with formatting
-                          return <pre className="font-mono text-sm overflow-x-auto">{JSON.stringify(parsed, null, 2)}</pre>;
-                        }
-                      } catch (error) {
-                        // Not valid JSON, continue to other formats
-                        console.log('Not valid JSON, trying other formats');
-                      }
-                    }
-                    
-                    // Check for multi-round dialogue format with ROUND markers
-                    if (content && content.includes('ROUND ')) {
-                      // Split the content by ROUND markers
-                      const roundMarkers = content.match(/ROUND \d+/g) || [];
-                      let rounds = [];
-                      
-                      if (roundMarkers.length > 0) {
-                        // First get all the round numbers
-                        const roundNumbers = roundMarkers.map(marker => marker.replace('ROUND ', '').trim());
-                        
-                        // Split the content into rounds
-                        let remainingContent = content;
-                        roundMarkers.forEach((marker, index) => {
-                          const markerPosition = remainingContent.indexOf(marker);
-                          
-                          if (markerPosition >= 0) {
-                            // If not the first round, save the previous round content
-                            if (index > 0) {
-                              const roundContent = remainingContent.substring(0, markerPosition).trim();
-                              rounds.push({ number: roundNumbers[index-1], content: roundContent });
-                            }
-                            
-                            // Remove the processed part for the next iteration
-                            remainingContent = remainingContent.substring(markerPosition + marker.length);
-                          }
-                        });
-                        
-                        // Add the last round
-                        if (remainingContent.trim()) {
-                          rounds.push({ number: roundNumbers[roundNumbers.length-1], content: remainingContent.trim() });
-                        }
-                        
-                        // If we have rounds, render them
-                        if (rounds.length > 0) {
-                          return (
-                            <div className="space-y-6">
-                              {rounds.map((round, idx) => {
-                                // Process speakers in this round
-                                const speakers = round.content.split(/\n(?=[A-Za-z].*?:)/).filter(line => line.trim());
-                                
-                                return (
-                                  <div key={idx} className="border border-gray-700 rounded-lg overflow-hidden mb-4">
-                                    <div className="bg-gray-700 px-4 py-2 text-blue-300 font-medium">
-                                      Round {round.number}
-                                    </div>
-                                    <div className="p-3 space-y-4">
-                                      {speakers.map((speaker, speakerIdx) => {
-                                        // Try to extract name and content
-                                        const match = speaker.match(/^([^:]+):(.*)/s);
-                                        if (match) {
-                                          const [_, name, text] = match;
-                                          // Extract thoughts (inside parentheses with asterisks)
-                                          const thoughtsMatch = text.match(/\(thinks\)\s*\*(.*?)\*/s);
-                                          const thoughts = thoughtsMatch ? thoughtsMatch[1].trim() : null;
-                                          
-                                          // Extract spoken dialogue (inside single quotes)
-                                          // Use a more robust regex that matches the last occurrence of quoted text
-                                          // This fixes issues with the dialogue extraction for the first speaker
-                                          let dialogue = text.trim();
-                                          
-                                          // First remove the thoughts part if it exists
-                                          if (thoughts) {
-                                            dialogue = dialogue.replace(/\(thinks\)\s*\*(.*?)\*/s, '').trim();
-                                          }
-                                          
-                                          // Then look for text in quotes
-                                          const dialogueMatch = dialogue.match(/'([^']*)'(?!.*')/s) || dialogue.match(/'(.*?)'$/s);
-                                          
-                                          if (dialogueMatch) {
-                                            dialogue = dialogueMatch[1].trim();
-                                          } else if (thoughts) {
-                                            // If no quoted text found but we have thoughts, assume the rest is dialogue
-                                            // but check for additional markers that might indicate dialogue
-                                            const postThoughtsText = text.split(/\(thinks\)\s*\*(.*?)\*/s).pop().trim();
-                                            if (postThoughtsText) {
-                                              dialogue = postThoughtsText;
-                                            }
-                                          }
-                                          
-                                          return (
-                                            <div key={speakerIdx} className="border-l-2 border-gray-600 pl-3 pb-2">
-                                              <div className="font-bold text-blue-400 mb-1">{name.trim()}</div>
-                                              {thoughts && (
-                                                <div className="italic text-gray-400 mb-2">
-                                                  <span className="font-normal text-xs mr-1">thinks:</span>
-                                                  {thoughts}
-                                                </div>
-                                              )}
-                                              <div className="text-gray-300">{dialogue}</div>
-                                            </div>
-                                          );
-                                        }
-                                        return <div key={speakerIdx}>{speaker}</div>;
-                                      })}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        }
-                      }
-                    }
-                    
-                    // If we reach here, just display the content as plain text
-                    return content;
-                    
-                  } catch (error) {
-                    console.error('Error rendering content:', error);
-                    return <span className="text-red-400">Error displaying content: {error.message}</span>;
-                  }
-                })()}
-              </div>
-            </div>
-          )}
-          
-          <div className="mt-8 flex justify-end">
-            <button
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete this simulation?')) {
-                  handleDeleteSimulation();
-                }
-              }}
-              className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors"
-            >
-              Delete Simulation
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {simulation?.entities && simulation?.entities.length > 0 && (
-        <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
-          <div className="p-4 bg-gray-750 border-b border-gray-700">
-            <h2 className="text-lg font-medium text-blue-300">Entity Details</h2>
-          </div>
-          
-          <div className="divide-y divide-gray-700">
-            {simulation?.entities.map((entity, index) => (
-              <div key={index} className="p-4">
-                <h3 className="text-md font-medium text-blue-300 mb-2">{entity?.name || 'Unnamed Entity'}</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">Type</h4>
-                    <p className="text-gray-300">{entity?.entity_type_name || 'Unknown Type'}</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">ID</h4>
-                    <p className="text-gray-300 font-mono text-sm">{entity?.id || 'No ID'}</p>
-                  </div>
-                </div>
-                
-                <div className="mt-3">
-                  <h4 className="text-sm font-medium text-gray-400 mb-1">Description</h4>
-                  <p className="text-gray-300 bg-gray-750 p-2 rounded">{entity?.description || 'No description available'}</p>
-                </div>
-                
-                {entity?.attributes && Object.keys(entity?.attributes).length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-400 mb-2">Attributes</h4>
-                    <div className="bg-gray-750 rounded-lg p-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                        {Object.entries(entity.attributes).map(([key, value]) => (
-                          <div key={key} className="flex justify-between py-1 border-b border-gray-700 last:border-0">
-                            <span className="text-gray-400">{key}:</span>
-                            <span className="text-gray-300 font-medium">
-                              {value === null ? 'null' :
-                               typeof value === 'object' ? JSON.stringify(value) : 
-                               String(value)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+            
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={handleCloseContinueDialog}
+                className="border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 py-2 px-4 rounded-md transition-colors"
+                disabled={continuing}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleContinueSimulation}
+                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
+                disabled={continuing}
+              >
+                {continuing ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  'Continue'
                 )}
-              </div>
-            ))}
+              </button>
+            </div>
           </div>
         </div>
       )}

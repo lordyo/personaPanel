@@ -375,6 +375,69 @@ const simulationApi = {
   delete: (id) => del(`/simulations/${id}`),
 }
 
+/**
+ * API methods for the unified simulation system.
+ * This is the newer, more flexible simulation API that handles any number of entities.
+ */
+const unifiedSimulationApi = {
+  /**
+   * Get all unified simulations, with optional filtering.
+   * 
+   * @param {Object} params - Query parameters for filtering simulations
+   *   @param {string} [params.entity_id] - Filter by entity ID
+   *   @param {string} [params.entity_type_id] - Filter by entity type ID
+   *   @param {string} [params.interaction_type] - Filter by interaction type (solo, dyadic, group)
+   *   @param {number} [params.limit=20] - Maximum number of results to return
+   *   @param {number} [params.offset=0] - Number of results to skip (for pagination)
+   * @returns {Promise} - List of simulations
+   */
+  getAll: (params) => {
+    const queryString = params ? `?${new URLSearchParams(params)}` : '';
+    return get(`/unified-simulations${queryString}`);
+  },
+  
+  /**
+   * Get a specific unified simulation by id.
+   * 
+   * @param {string} id - The simulation id
+   * @returns {Promise} - The simulation data
+   */
+  getById: (id) => get(`/unified-simulations/${id}`),
+  
+  /**
+   * Create a new unified simulation.
+   * 
+   * @param {Object} simulation - The simulation data
+   *   @param {string} simulation.context - Text description of the situation
+   *   @param {string[]} simulation.entities - Array of entity IDs to include
+   *   @param {number} [simulation.n_turns=1] - Number of turns to generate per round
+   *   @param {number} [simulation.simulation_rounds=1] - Number of sequential LLM calls to make
+   *   @param {Object} [simulation.metadata] - Optional metadata for the simulation
+   *   @param {string} [simulation.name] - Optional name for the simulation
+   * @returns {Promise} - The created simulation
+   */
+  create: (simulation) => post('/unified-simulations', simulation),
+  
+  /**
+   * Continue an existing unified simulation with more turns.
+   * 
+   * @param {string} id - The simulation id to continue
+   * @param {Object} options - Continuation options
+   *   @param {number} [options.n_turns=1] - Number of turns to generate per round
+   *   @param {number} [options.simulation_rounds=1] - Number of sequential LLM calls to make
+   * @returns {Promise} - The updated simulation
+   */
+  continue: (id, options) => post(`/unified-simulations/${id}/continue`, options),
+  
+  /**
+   * Delete a unified simulation by id.
+   * 
+   * @param {string} id - The simulation id to delete
+   * @returns {Promise} - Response indicating success or failure
+   */
+  delete: (id) => del(`/unified-simulations/${id}`),
+}
+
 // Export a default API object with all the API functions
 const api = {
   // Base methods
@@ -406,14 +469,22 @@ const api = {
   createSimulation: simulationApi.create,
   deleteSimulation: simulationApi.delete,
   
+  // New unified simulation methods
+  getUnifiedSimulations: unifiedSimulationApi.getAll,
+  getUnifiedSimulation: unifiedSimulationApi.getById,
+  createUnifiedSimulation: unifiedSimulationApi.create,
+  continueUnifiedSimulation: unifiedSimulationApi.continue,
+  deleteUnifiedSimulation: unifiedSimulationApi.delete,
+  
   // Original API objects
   entityType: entityTypeApi,
   entity: entityApi,
   template: templateApi,
-  simulation: simulationApi
+  simulation: simulationApi,
+  unifiedSimulation: unifiedSimulationApi
 };
 
 // Export the API objects as named exports as well
-export { entityTypeApi, entityApi, templateApi, simulationApi };
+export { entityTypeApi, entityApi, templateApi, simulationApi, unifiedSimulationApi };
 
 export default api; 
