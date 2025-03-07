@@ -161,7 +161,8 @@ The backend infrastructure (Epic 4) includes the following components:
 
 ## Documentation
 
-See the `docs/` directory for detailed technical specifications and development guidelines.
+- [Backend Structure](backend/README.md) - Overview of the backend directory structure
+- [Simulation Improvements](docs/simulation_improvements.md) - Documentation of the recent simulation system improvements
 
 ## License
 
