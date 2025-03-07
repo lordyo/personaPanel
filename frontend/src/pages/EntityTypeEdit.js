@@ -88,16 +88,73 @@ const EntityTypeEdit = () => {
       setNameError('');
     }
     
+    // Process form data before validation
+    const processedDimensions = [...dimensions];
+    
     // Validate dimensions
     const dimensionErrors = [];
-    dimensions.forEach((dimension, idx) => {
+    processedDimensions.forEach((dimension, idx) => {
       if (!dimension.name.trim()) {
         dimensionErrors.push(`Dimension ${idx + 1} needs a name`);
         isValid = false;
       }
       
-      if (dimension.type === 'categorical' && (!dimension.options || dimension.options.length === 0)) {
+      // Debug for categorical options
+      if (dimension.type === 'categorical') {
+        console.log(`Validating categorical dimension "${dimension.name}":`);
+        console.log("Options:", dimension.options);
+        console.log("Distribution values:", dimension.distribution_values);
+        
+        // Ensure options and distribution_values are in sync
+        if (dimension.distribution_values && Object.keys(dimension.distribution_values).length > 0) {
+          // Get all keys from distribution_values
+          const distributionKeys = Object.keys(dimension.distribution_values);
+          
+          // If options is empty or missing, use the keys from distribution_values
+          if (!dimension.options || dimension.options.length === 0) {
+            console.log("Fixing missing options array from distribution_values");
+            dimension.options = [...distributionKeys];
+          }
+          // If options has different entries than distribution_values, merge them
+          else if (JSON.stringify(dimension.options.sort()) !== JSON.stringify(distributionKeys.sort())) {
+            console.log("Synchronizing options with distribution_values");
+            
+            // Add any missing options to distribution_values
+            const missingInDistribution = dimension.options.filter(opt => !distributionKeys.includes(opt));
+            missingInDistribution.forEach(opt => {
+              dimension.distribution_values[opt] = 0;  // Initialize with 0
+            });
+            
+            // Add any missing distribution keys to options
+            const missingInOptions = distributionKeys.filter(key => !dimension.options.includes(key));
+            if (missingInOptions.length > 0) {
+              dimension.options = [...dimension.options, ...missingInOptions];
+            }
+            
+            // Normalize the distribution values
+            const total = Object.values(dimension.distribution_values).reduce((sum, val) => sum + val, 0);
+            if (total > 0 && Math.abs(total - 1) > 0.01) {
+              Object.keys(dimension.distribution_values).forEach(key => {
+                dimension.distribution_values[key] /= total;
+              });
+            }
+          }
+        }
+        // If we have options but no distribution_values, create them
+        else if (dimension.options && dimension.options.length > 0 && 
+                (!dimension.distribution_values || Object.keys(dimension.distribution_values).length === 0)) {
+          console.log("Creating distribution_values from options");
+          const equalShare = 1 / dimension.options.length;
+          dimension.distribution_values = {};
+          dimension.options.forEach(option => {
+            dimension.distribution_values[option] = equalShare;
+          });
+        }
+      }
+      
+      if (dimension.type === 'categorical' && (!dimension.options || !Array.isArray(dimension.options) || dimension.options.length === 0)) {
         dimensionErrors.push(`Dimension "${dimension.name || idx + 1}" needs at least one option`);
+        console.error(`Dimension "${dimension.name}" missing options:`, dimension.options);
         isValid = false;
       }
 
@@ -190,47 +247,87 @@ const EntityTypeEdit = () => {
       setDimensionsError('');
     }
     
+    // Update the dimensions state with the processed data
+    setDimensions(processedDimensions);
+    
     return isValid;
   };
 
   const handleSave = async () => {
-    if (!validateForm()) {
-      return;
+    // Blur any active elements to trigger onBlur handlers
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
     }
     
-    setSaving(true);
-    setSuccess(false);
-    
-    try {
-      const entityTypeData = {
-        name,
-        description,
-        dimensions
-      };
-      
-      const response = await entityTypeApi.update(id, entityTypeData);
-      
-      if (response && response.status === 'success') {
-        setSuccess(true);
-        setError(null);
-        
-        // Reset validation errors
-        setNameError('');
-        setDimensionsError('');
-        
-        setTimeout(() => {
-          navigate(`/entity-types/${id}`);
-        }, 1500);
-      } else {
-        console.error('Error updating entity type:', response?.message || 'Unknown error');
-        setError(`Failed to update entity type: ${response?.message || 'Unknown error'}`);
+    // Small delay to ensure blur handlers have completed
+    setTimeout(async () => {
+      if (!validateForm()) {
+        return;
       }
-    } catch (err) {
-      console.error('Error updating entity type:', err);
-      setError('Failed to update entity type. Please try again later.');
-    } finally {
-      setSaving(false);
-    }
+      
+      setSaving(true);
+      setSuccess(false);
+      
+      // Add debug logging to see what we're submitting
+      console.log("Submitting dimensions:", dimensions);
+      
+      // Prepare dimensions with all needed properties
+      const preparedDimensions = dimensions.map(d => {
+        const prepared = {
+          name: d.name,
+          description: d.description,
+          type: d.type,
+        };
+        
+        // Add type-specific properties
+        if (d.type === 'categorical') {
+          prepared.options = Array.isArray(d.options) ? [...d.options] : [];
+          prepared.distribution_values = d.distribution_values ? {...d.distribution_values} : {};
+        } else if (d.type === 'int' || d.type === 'float') {
+          prepared.min_value = d.min_value;
+          prepared.max_value = d.max_value;
+          prepared.distribution = d.distribution;
+          prepared.spread_factor = d.spread_factor;
+          prepared.skew_factor = d.skew_factor;
+          prepared.std_deviation = d.std_deviation; // For legacy support
+        } else if (d.type === 'boolean') {
+          prepared.true_percentage = d.true_percentage;
+        }
+        
+        return prepared;
+      });
+      
+      try {
+        const entityTypeData = {
+          name,
+          description,
+          dimensions: preparedDimensions
+        };
+        
+        const response = await entityTypeApi.update(id, entityTypeData);
+        
+        if (response && response.status === 'success') {
+          setSuccess(true);
+          setError(null);
+          
+          // Reset validation errors
+          setNameError('');
+          setDimensionsError('');
+          
+          setTimeout(() => {
+            navigate(`/entity-types/${id}`);
+          }, 1500);
+        } else {
+          console.error('Error updating entity type:', response?.message || 'Unknown error');
+          setError(`Failed to update entity type: ${response?.message || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error('Error updating entity type:', err);
+        setError('Failed to update entity type. Please try again later.');
+      } finally {
+        setSaving(false);
+      }
+    }, 100);
   };
 
   const handleAddDimension = () => {
@@ -249,8 +346,19 @@ const EntityTypeEdit = () => {
   };
 
   const handleUpdateDimension = (index, updatedDimension) => {
-    const newDimensions = [...dimensions];
-    newDimensions[index] = updatedDimension;
+    // Create a deep copy to prevent reference issues
+    const newDimensions = dimensions.map((dim, i) => {
+      if (i === index) {
+        // Ensure we're keeping all properties, especially distribution_values for categorical dimensions
+        return {
+          ...dim,
+          ...updatedDimension
+        };
+      }
+      return dim;
+    });
+    
+    // Set dimensions with the updated array
     setDimensions(newDimensions);
   };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import EntityCard from '../components/EntityCard';
 import EntityForm from '../components/EntityForm';
@@ -13,6 +13,8 @@ import LoadingIndicator from '../components/LoadingIndicator';
  * @returns {JSX.Element} - Rendered component
  */
 const EntityList = () => {
+  const location = useLocation();
+  
   const [entityTypes, setEntityTypes] = useState([]);
   const [entities, setEntities] = useState([]);
   const [filteredEntities, setFilteredEntities] = useState([]);
@@ -21,16 +23,30 @@ const EntityList = () => {
   const [editingEntity, setEditingEntity] = useState(null);
   const [editingEntityType, setEditingEntityType] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [generatingEntities, setGeneratingEntities] = useState(false);
+  // Check if we should open generation panel automatically based on location state
+  const [generatingEntities, setGeneratingEntities] = useState(
+    location.state?.entityTypeId ? true : false
+  );
+  // Initialize filter with entityTypeId from location state if available
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterTypeId, setFilterTypeId] = useState('');
+  const [filterTypeId, setFilterTypeId] = useState(location.state?.entityTypeId || '');
   const [error, setError] = useState(null);
-  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // {id, name} for single entity or {typeId, typeName} for all of a type
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // Pre-select the entity type in the generation form if provided via location state
+  const [preselectedEntityTypeId, setPreselectedEntityTypeId] = useState(
+    location.state?.entityTypeId || ''
+  );
   
   // Fetch entity types and entities on component mount
   useEffect(() => {
     fetchData();
+    
+    // Clear location state after using it to avoid persistence on refresh
+    if (location.state?.entityTypeId) {
+      window.history.replaceState({}, document.title);
+    }
   }, []);
   
   // Define fetchData function in the component scope so it can be reused
@@ -411,6 +427,7 @@ const EntityList = () => {
             entityTypes={entityTypes}
             onSubmit={handleGenerateEntities}
             disabled={loading}
+            preselectedEntityTypeId={preselectedEntityTypeId}
           />
           <button
             onClick={() => setGeneratingEntities(false)}

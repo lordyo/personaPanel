@@ -24,8 +24,19 @@ const EntityTypeCreate = () => {
   const [saving, setSaving] = useState(false);
   
   const handleUpdateDimension = (index, updatedDimension) => {
-    const newDimensions = [...dimensions];
-    newDimensions[index] = updatedDimension;
+    // Create a deep copy to prevent reference issues
+    const newDimensions = dimensions.map((dim, i) => {
+      if (i === index) {
+        // Ensure we're keeping all properties, especially distribution_values for categorical dimensions
+        return {
+          ...dim,
+          ...updatedDimension
+        };
+      }
+      return dim;
+    });
+    
+    // Set dimensions with the updated array
     setDimensions(newDimensions);
   };
   
@@ -59,16 +70,67 @@ const EntityTypeCreate = () => {
       return false;
     }
     
-    for (let i = 0; i < dimensions.length; i++) {
-      const dim = dimensions[i];
+    // Process form data before validation
+    const processedDimensions = [...dimensions];
+    
+    for (let i = 0; i < processedDimensions.length; i++) {
+      const dim = processedDimensions[i];
       if (!dim.name || !dim.type) {
         setError(`Dimension ${i + 1} is missing required fields`);
         return false;
       }
       
-      if (dim.type === 'categorical' && (!dim.options || dim.options.length === 0)) {
-        setError(`Dimension "${dim.name}" needs at least one option`);
-        return false;
+      // Debug for categorical options
+      if (dim.type === 'categorical') {
+        console.log(`Validating categorical dimension "${dim.name}":`);
+        console.log("Options:", dim.options);
+        console.log("Distribution values:", dim.distribution_values);
+        
+        // Ensure options and distribution_values are in sync
+        if (dim.distribution_values && Object.keys(dim.distribution_values).length > 0) {
+          // Get all keys from distribution_values
+          const distributionKeys = Object.keys(dim.distribution_values);
+          
+          // If options is empty or missing, use the keys from distribution_values
+          if (!dim.options || dim.options.length === 0) {
+            console.log("Fixing missing options array from distribution_values");
+            dim.options = [...distributionKeys];
+          }
+          // If options has different entries than distribution_values, merge them
+          else if (JSON.stringify(dim.options.sort()) !== JSON.stringify(distributionKeys.sort())) {
+            console.log("Synchronizing options with distribution_values");
+            
+            // Add any missing options to distribution_values
+            const missingInDistribution = dim.options.filter(opt => !distributionKeys.includes(opt));
+            missingInDistribution.forEach(opt => {
+              dim.distribution_values[opt] = 0;  // Initialize with 0
+            });
+            
+            // Add any missing distribution keys to options
+            const missingInOptions = distributionKeys.filter(key => !dim.options.includes(key));
+            if (missingInOptions.length > 0) {
+              dim.options = [...dim.options, ...missingInOptions];
+            }
+            
+            // Normalize the distribution values
+            const total = Object.values(dim.distribution_values).reduce((sum, val) => sum + val, 0);
+            if (total > 0 && Math.abs(total - 1) > 0.01) {
+              Object.keys(dim.distribution_values).forEach(key => {
+                dim.distribution_values[key] /= total;
+              });
+            }
+          }
+        }
+        // If we have options but no distribution_values, create them
+        else if (dim.options && dim.options.length > 0 && 
+                (!dim.distribution_values || Object.keys(dim.distribution_values).length === 0)) {
+          console.log("Creating distribution_values from options");
+          const equalShare = 1 / dim.options.length;
+          dim.distribution_values = {};
+          dim.options.forEach(option => {
+            dim.distribution_values[option] = equalShare;
+          });
+        }
       }
       
       if (dim.type === 'int' || dim.type === 'float') {
@@ -132,7 +194,16 @@ const EntityTypeCreate = () => {
           dim.distribution_values = normalizedValues;
         }
       }
+      
+      if (dim.type === 'categorical' && (!dim.options || !Array.isArray(dim.options) || dim.options.length === 0)) {
+        setError(`Dimension "${dim.name}" needs at least one option`);
+        console.error(`Dimension "${dim.name}" missing options:`, dim.options);
+        return false;
+      }
     }
+    
+    // Update the dimensions state with the processed data
+    setDimensions(processedDimensions);
     
     return true;
   };
@@ -140,37 +211,66 @@ const EntityTypeCreate = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      return;
+    // Blur any active elements to trigger onBlur handlers
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
     }
     
-    setSaving(true);
-    try {
-      const response = await entityTypeApi.create({
-        name,
-        description,
-        dimensions: dimensions.map(d => ({
+    // Small delay to ensure blur handlers have completed
+    setTimeout(async () => {
+      if (!validateForm()) {
+        return;
+      }
+      
+      // Add debug logging to see what we're submitting
+      console.log("Submitting dimensions:", dimensions);
+      
+      // Prepare dimensions with all needed properties
+      const preparedDimensions = dimensions.map(d => {
+        const prepared = {
           name: d.name,
           description: d.description,
           type: d.type,
-          options: d.options,
-          min_value: d.min_value,
-          max_value: d.max_value,
-          distribution: d.distribution
-        }))
+        };
+        
+        // Add type-specific properties
+        if (d.type === 'categorical') {
+          prepared.options = Array.isArray(d.options) ? [...d.options] : [];
+          prepared.distribution_values = d.distribution_values ? {...d.distribution_values} : {};
+        } else if (d.type === 'int' || d.type === 'float') {
+          prepared.min_value = d.min_value;
+          prepared.max_value = d.max_value;
+          prepared.distribution = d.distribution;
+          prepared.spread_factor = d.spread_factor;
+          prepared.skew_factor = d.skew_factor;
+        } else if (d.type === 'boolean') {
+          prepared.true_percentage = d.true_percentage;
+        }
+        
+        return prepared;
       });
       
-      if (response.status === 'success') {
-        navigate('/entity-types');
-      } else {
-        setError(response.message || 'Failed to create entity type');
+      setSaving(true);
+      try {
+        const response = await entityTypeApi.create({
+          name,
+          description,
+          dimensions: preparedDimensions
+        });
+        
+        if (response.status === 'success') {
+          navigate('/entity-types');
+        } else {
+          setError(response.message || 'Failed to create entity type');
+          console.error("API error response:", response);
+        }
+      } catch (err) {
+        setError('Error creating entity type. Please try again.');
+        console.error('Error creating entity type:', err);
+      } finally {
+        setSaving(false);
       }
-    } catch (err) {
-      setError('Error creating entity type. Please try again.');
-      console.error('Error creating entity type:', err);
-    } finally {
-      setSaving(false);
-    }
+    }, 100);
   };
   
   return (

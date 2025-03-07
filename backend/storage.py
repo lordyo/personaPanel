@@ -943,4 +943,40 @@ def get_simulations(
         logging.error(f"Error fetching simulations: {str(e)}")
         return []
     finally:
+        conn.close()
+
+
+def delete_entity_type(entity_type_id: str) -> bool:
+    """
+    Delete an entity type from the database.
+    
+    Args:
+        entity_type_id: ID of the entity type to delete
+        
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # First, delete all entities of this type
+        cursor.execute('DELETE FROM entities WHERE entity_type_id = ?', (entity_type_id,))
+        
+        # Then delete the entity type
+        cursor.execute('DELETE FROM entity_types WHERE id = ?', (entity_type_id,))
+        
+        if cursor.rowcount == 0:
+            # No rows affected, entity type not found
+            conn.rollback()
+            conn.close()
+            return False
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error deleting entity type: {e}")
+        conn.rollback()
+        return False
+    finally:
         conn.close() 

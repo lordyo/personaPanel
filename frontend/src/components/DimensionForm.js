@@ -21,22 +21,30 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
   // Update raw options input when dimension.options changes externally
   useEffect(() => {
     if (dimension.type === 'categorical') {
-      setRawOptionsInput((dimension.options || []).join(', '));
+      // Only update rawOptionsInput if it's empty - this allows user to type freely
+      if (rawOptionsInput === '') {
+        const optionsString = (dimension.options || []).join(', ');
+        setRawOptionsInput(optionsString);
+      }
       
       // Initialize percentages with equal distribution if not set
-      if (dimension.options && (!dimension.distribution_values || Object.keys(dimension.distribution_values).length !== dimension.options.length)) {
+      if (dimension.options && dimension.options.length > 0 && 
+          (!dimension.distribution_values || 
+          Object.keys(dimension.distribution_values).length !== dimension.options.length)) {
         const equalShare = 1 / dimension.options.length;
         const newPercentages = {};
         dimension.options.forEach(option => {
           newPercentages[option] = equalShare;
         });
         setCategoryPercentages(newPercentages);
-        handleFieldChange('distribution_values', newPercentages);
+        handleFieldChange('distribution_values', {...newPercentages});
       } else if (dimension.distribution_values) {
         setCategoryPercentages(dimension.distribution_values);
       }
     }
-  }, [dimension.options, dimension.type, dimension.distribution_values]);
+  // Only depend on dimension.type to avoid unwanted re-renders
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dimension.type]);
 
   const handleFieldChange = (field, value) => {
     onChange({ ...dimension, [field]: value });
@@ -59,12 +67,71 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
       newDimension.spread_factor = 0.5; // Default to medium spread instead of std_deviation
       newDimension.skew_factor = 0;
     } else if (type === 'categorical') {
-      newDimension.options = [];
+      // Initialize with empty arrays and objects
+      newDimension.options = []; // Ensure it's an empty array, not undefined
       newDimension.distribution_values = {};
       setRawOptionsInput('');
+      // Reset the category percentages
+      setCategoryPercentages({});
+      
+      console.log("Initialized categorical dimension:", newDimension);
     }
     
     onChange(newDimension);
+  };
+
+  // Helper function to parse options and update dimension
+  const parseAndUpdateOptions = (inputText) => {
+    // Process options - split by comma and clean up
+    const options = inputText.split(',')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
+    
+    console.log("Final parsed options:", options);
+    
+    // First check if we already have distribution_values to incorporate
+    const existingDistributionValues = dimension.distribution_values || {};
+    
+    // Start with existing percentages where possible
+    const newPercentages = {...existingDistributionValues};
+    
+    // Add missing options with equal share of remaining percentage
+    const missingOptions = options.filter(opt => !newPercentages[opt]);
+    if (missingOptions.length > 0) {
+      const existingTotal = Object.values(newPercentages).reduce((sum, val) => sum + val, 0);
+      const remainingShare = Math.max(0, 1 - existingTotal);
+      const sharePerMissing = missingOptions.length > 0 ? remainingShare / missingOptions.length : 0;
+      
+      missingOptions.forEach(option => {
+        newPercentages[option] = sharePerMissing;
+      });
+    }
+    
+    // Remove percentages for options that no longer exist
+    Object.keys(newPercentages).forEach(key => {
+      if (!options.includes(key)) {
+        delete newPercentages[key];
+      }
+    });
+    
+    // Normalize if needed
+    const total = Object.values(newPercentages).reduce((sum, val) => sum + val, 0);
+    if (Math.abs(total - 1) > 0.01 && total > 0) {
+      Object.keys(newPercentages).forEach(key => {
+        newPercentages[key] = newPercentages[key] / total;
+      });
+    }
+    
+    // IMPORTANT: Update both the options array and distribution_values at the same time
+    // This ensures they stay in sync
+    const updatedDimension = {
+      ...dimension,
+      options: [...options],
+      distribution_values: {...newPercentages}
+    };
+    
+    setCategoryPercentages(newPercentages);
+    onChange(updatedDimension);  // Use onChange instead of handleFieldChange to update the whole dimension
   };
 
   // Handle change in categorical option percentages
@@ -86,9 +153,22 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
         normalizedPercentages[key] = newPercentages[key] / total;
       });
       setCategoryPercentages(normalizedPercentages);
-      handleFieldChange('distribution_values', normalizedPercentages);
+      
+      // Make sure options array matches distribution_values keys
+      const updatedDimension = {
+        ...dimension,
+        distribution_values: normalizedPercentages,
+        options: Object.keys(normalizedPercentages)
+      };
+      onChange(updatedDimension);
     } else {
-      handleFieldChange('distribution_values', newPercentages);
+      // Make sure options array matches distribution_values keys
+      const updatedDimension = {
+        ...dimension,
+        distribution_values: newPercentages,
+        options: Object.keys(newPercentages)
+      };
+      onChange(updatedDimension);
     }
   };
 
@@ -135,29 +215,21 @@ const DimensionForm = ({ dimension, onChange, onRemove }) => {
                 rows="3"
                 value={rawOptionsInput}
                 onChange={(e) => {
-                  // Store raw input
+                  // Just update the raw input on keystroke without parsing
                   setRawOptionsInput(e.target.value);
-                  
-                  // Process options
-                  const options = e.target.value.split(',')
-                    .map(item => item.trim())
-                    .filter(Boolean);
-                  
-                  // Update options
-                  handleFieldChange('options', options);
-                  
-                  // Initialize distribution values with equal distribution
-                  if (options.length > 0) {
-                    const equalShare = 1 / options.length;
-                    const newPercentages = {};
-                    options.forEach(option => {
-                      newPercentages[option] = equalShare;
-                    });
-                    setCategoryPercentages(newPercentages);
-                    handleFieldChange('distribution_values', newPercentages);
+                }}
+                onKeyDown={(e) => {
+                  // Also parse on Enter key (but don't submit the form)
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    parseAndUpdateOptions(e.target.value);
                   }
                 }}
-                placeholder="Enter options separated by commas (e.g. Red, Green, Blue)"
+                onBlur={(e) => {
+                  // Only parse and update options when the user has finished typing (on blur)
+                  parseAndUpdateOptions(e.target.value);
+                }}
+                placeholder="Enter options separated by commas (e.g. Red, Green, Blue) and press Tab or click elsewhere when done"
               />
             </div>
             

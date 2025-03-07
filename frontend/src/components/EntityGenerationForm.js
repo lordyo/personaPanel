@@ -7,60 +7,76 @@ import React, { useState, useEffect } from 'react';
  * @param {Array} props.entityTypes - Available entity types
  * @param {Function} props.onSubmit - Function to call when form is submitted
  * @param {boolean} props.disabled - Whether the form is disabled
+ * @param {string} props.preselectedEntityTypeId - Optional entity type ID to preselect
  * @returns {JSX.Element} - Rendered component
  */
-const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
-  const [entityTypeId, setEntityTypeId] = useState('');
+const EntityGenerationForm = ({ 
+  entityTypes, 
+  onSubmit, 
+  disabled = false,
+  preselectedEntityTypeId = ''
+}) => {
+  const [entityTypeId, setEntityTypeId] = useState(preselectedEntityTypeId || '');
   const [entityDescription, setEntityDescription] = useState('');
   const [count, setCount] = useState(1);
   const [variability, setVariability] = useState(0.5);
   const [error, setError] = useState(null);
   
+  // Update entity type and description when preselectedEntityTypeId changes
+  useEffect(() => {
+    if (preselectedEntityTypeId && entityTypes.some(type => type.id === preselectedEntityTypeId)) {
+      setEntityTypeId(preselectedEntityTypeId);
+      
+      // Also set the description based on this type
+      const selectedType = entityTypes.find(type => type.id === preselectedEntityTypeId);
+      if (selectedType && selectedType.description) {
+        setEntityDescription(selectedType.description);
+      }
+    }
+  }, [preselectedEntityTypeId, entityTypes]);
+  
   // Load saved settings from localStorage when component mounts
   useEffect(() => {
-    // Load entityTypeId if saved
-    const savedEntityTypeId = localStorage.getItem('entityGenerationSettings.entityTypeId');
-    // Load count if saved
-    const savedCount = localStorage.getItem('entityGenerationSettings.count');
-    // Load variability if saved
-    const savedVariability = localStorage.getItem('entityGenerationSettings.variability');
-    
-    // Apply saved settings if they exist
-    if (savedEntityTypeId) {
-      // Only set if it's a valid entity type id
-      if (entityTypes.some(type => type.id === savedEntityTypeId)) {
-        setEntityTypeId(savedEntityTypeId);
+    // Only load saved settings if no preselectedEntityTypeId is provided
+    if (!preselectedEntityTypeId) {
+      // Load entityTypeId if saved
+      const savedEntityTypeId = localStorage.getItem('entityGenerationSettings.entityTypeId');
+      // Load count if saved
+      const savedCount = localStorage.getItem('entityGenerationSettings.count');
+      // Load variability if saved
+      const savedVariability = localStorage.getItem('entityGenerationSettings.variability');
+      
+      // Apply saved settings if they exist
+      if (savedEntityTypeId) {
+        // Only set if it's a valid entity type id
+        if (entityTypes.some(type => type.id === savedEntityTypeId)) {
+          setEntityTypeId(savedEntityTypeId);
+          
+          // Also set the description based on this type
+          const selectedType = entityTypes.find(type => type.id === savedEntityTypeId);
+          if (selectedType && selectedType.description) {
+            setEntityDescription(selectedType.description);
+          }
+        }
+      } else if (entityTypes.length > 0) {
+        // Default to first entity type if no saved type
+        setEntityTypeId(entityTypes[0].id);
         
-        // Also set the description based on this type
-        const selectedType = entityTypes.find(type => type.id === savedEntityTypeId);
-        if (selectedType && selectedType.description) {
-          setEntityDescription(selectedType.description);
+        // Initialize the description with the entity type description
+        if (entityTypes[0].description) {
+          setEntityDescription(entityTypes[0].description);
         }
       }
-    } else if (entityTypes.length > 0) {
-      // Default to first entity type if no saved type
-      setEntityTypeId(entityTypes[0].id);
       
-      // Initialize the description with the entity type description
-      if (entityTypes[0].description) {
-        setEntityDescription(entityTypes[0].description);
+      if (savedCount) {
+        setCount(parseInt(savedCount));
+      }
+      
+      if (savedVariability) {
+        setVariability(parseFloat(savedVariability));
       }
     }
-    
-    if (savedCount) {
-      const parsedCount = parseInt(savedCount);
-      if (!isNaN(parsedCount) && parsedCount >= 1 && parsedCount <= 50) {
-        setCount(parsedCount);
-      }
-    }
-    
-    if (savedVariability) {
-      const parsedVariability = parseFloat(savedVariability);
-      if (!isNaN(parsedVariability) && parsedVariability >= 0 && parsedVariability <= 1) {
-        setVariability(parsedVariability);
-      }
-    }
-  }, [entityTypes]);
+  }, [entityTypes, preselectedEntityTypeId]);
   
   // Update description when entity type changes
   const handleEntityTypeChange = (e) => {

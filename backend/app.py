@@ -1514,6 +1514,32 @@ def continue_unified_simulation(simulation_id):
             logger.error(f"SQLite error: {str(e)}")
             return error_response(f"Database error: {str(e)}", 500)
 
+@app.route('/api/entity-types/<entity_type_id>', methods=['DELETE'])
+@handle_exceptions
+def delete_entity_type(entity_type_id):
+    """
+    Delete an entity type by ID.
+    
+    Args:
+        entity_type_id: ID of the entity type
+        
+    Returns:
+        JSON response indicating success or failure
+    """
+    # Check if entity type exists
+    entity_type = storage.get_entity_type(entity_type_id)
+    if not entity_type:
+        return error_response(f"Entity type with ID {entity_type_id} not found", 404)
+    
+    success = storage.delete_entity_type(entity_type_id)
+    
+    if success:
+        logger.info(f"Deleted entity type: {entity_type_id}")
+        return success_response({"message": f"Entity type {entity_type_id} deleted successfully"})
+    else:
+        logger.error(f"Failed to delete entity type: {entity_type_id}")
+        return error_response("Failed to delete entity type", 500)
+
 if __name__ == '__main__':
     # Use environment variable for port or default to 5001 (avoiding common 5000 port)
     port = int(os.environ.get('BACKEND_PORT', 5001))
