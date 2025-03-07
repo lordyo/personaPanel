@@ -1223,6 +1223,40 @@ def get_unified_simulation(simulation_id):
         "final_turn_number": final_turn_number
     })
 
+@app.route('/api/unified-simulations/<simulation_id>', methods=['DELETE'])
+@handle_exceptions
+def delete_unified_simulation(simulation_id):
+    """
+    Delete a simulation created with the unified simulation system.
+    
+    Args:
+        simulation_id: The ID of the simulation to delete
+        
+    Returns:
+        JSON response indicating success or failure
+    """
+    logger = logging.getLogger('app')
+    logger.info(f"Deleting simulation with ID: {simulation_id}")
+    
+    # Check if the simulation exists
+    simulation = storage.get_simulation(simulation_id)
+    if not simulation:
+        logger.warning(f"Simulation with ID {simulation_id} not found")
+        return error_response(f"Simulation with ID {simulation_id} not found", 404)
+    
+    # Delete the simulation
+    try:
+        success = storage.delete_simulation(simulation_id)
+        if success:
+            logger.info(f"Successfully deleted simulation {simulation_id}")
+            return success_response({"message": f"Simulation {simulation_id} deleted successfully"})
+        else:
+            logger.error(f"Failed to delete simulation {simulation_id}")
+            return error_response(f"Failed to delete simulation {simulation_id}", 500)
+    except Exception as e:
+        logger.exception(f"Error deleting simulation {simulation_id}: {str(e)}")
+        return error_response(f"Error deleting simulation: {str(e)}", 500)
+
 @app.route('/api/unified-simulations', methods=['GET'])
 @handle_exceptions
 def get_unified_simulations():
@@ -1246,40 +1280,84 @@ def get_unified_simulations():
     limit = int(request.args.get('limit', 20))
     offset = int(request.args.get('offset', 0))
     
-    # Get all simulations
-    simulations = storage.get_simulations(
-        entity_id=entity_id,
-        entity_type_id=entity_type_id,
-        interaction_type=interaction_type,
-        limit=limit,
-        offset=offset
-    )
+    logger.info(f"Getting unified simulations with params: entity_id={entity_id}, entity_type_id={entity_type_id}, interaction_type={interaction_type}, limit={limit}, offset={offset}")
+    
+    # Get all simulations directly from the database to verify they exist
+    try:
+        conn = sqlite3.connect(storage.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM simulations")
+        count = cursor.fetchone()[0]
+        logger.info(f"Database contains {count} simulations")
+        
+        if count > 0:
+            cursor.execute("SELECT id, timestamp, name FROM simulations LIMIT 5")
+            sample = cursor.fetchall()
+            logger.info(f"Sample simulations: {sample}")
+    except Exception as e:
+        logger.error(f"Error checking database directly: {str(e)}")
+    finally:
+        conn.close()
+    
+    # Try get_all_simulations instead of get_simulations
+    try:
+        simulations = storage.get_all_simulations()
+        logger.info(f"Retrieved {len(simulations)} simulations from get_all_simulations")
+    except Exception as e:
+        logger.error(f"Error using get_all_simulations: {str(e)}")
+        # Fall back to get_simulations
+        simulations = storage.get_simulations(
+            entity_id=entity_id,
+            entity_type_id=entity_type_id,
+            interaction_type=interaction_type,
+            limit=limit,
+            offset=offset
+        )
+        logger.info(f"Retrieved {len(simulations)} simulations from get_simulations")
     
     # Format the response
     result = []
     for sim in simulations:
-        # Get the context
-        context = storage.get_context(sim['context_id'])
-        
-        # Get entity names
-        entity_names = []
-        for entity_id in sim['entity_ids']:
-            entity = storage.get_entity(entity_id)
-            if entity:
-                entity_names.append(entity.get('name', 'Unknown'))
-        
-        result.append({
-            "id": sim['id'],
-            "context_id": sim['context_id'],
-            "context": context['description'] if context else "",
-            "interaction_type": sim['interaction_type'],
-            "entity_ids": sim['entity_ids'],
-            "entity_names": entity_names,
-            "created_at": sim.get('timestamp', ''),
-            "summary": sim.get('metadata', {}).get('summary', ''),
-            "final_turn_number": sim.get('final_turn_number', 0)
-        })
+        logger.info(f"Processing simulation: {sim.get('id')}")
+        try:
+            # Get the context
+            context_id = sim.get('context_id')
+            if context_id:
+                context = storage.get_context(context_id)
+            else:
+                context = None
+            
+            # Get entity names
+            entity_names = []
+            entity_ids = sim.get('entity_ids', [])
+            if isinstance(entity_ids, str):
+                try:
+                    entity_ids = json.loads(entity_ids)
+                except:
+                    entity_ids = []
+            
+            for entity_id in entity_ids:
+                entity = storage.get_entity(entity_id)
+                if entity:
+                    entity_names.append(entity.get('name', 'Unknown'))
+            
+            result.append({
+                "id": sim.get('id'),
+                "context_id": sim.get('context_id'),
+                "context": context.get('description', '') if context else "",
+                "interaction_type": sim.get('interaction_type'),
+                "entity_ids": entity_ids,
+                "entity_names": entity_names,
+                "created_at": sim.get('timestamp', ''),
+                "summary": sim.get('metadata', {}).get('summary', ''),
+                "final_turn_number": sim.get('final_turn_number', 0),
+                "name": sim.get('name', f"Simulation {sim.get('timestamp', '')[:10]}")
+            })
+        except Exception as e:
+            logger.error(f"Error processing simulation {sim.get('id')}: {str(e)}")
+            logger.exception("Exception details:")
     
+    logger.info(f"Returning {len(result)} formatted simulations")
     return success_response(result)
 
 @app.route('/api/unified-simulations/<simulation_id>/continue', methods=['POST'])
@@ -1438,7 +1516,7 @@ def continue_unified_simulation(simulation_id):
 
 if __name__ == '__main__':
     # Use environment variable for port or default to 5001 (avoiding common 5000 port)
-    port = int(os.environ.get('PORT', 5001))
+    port = int(os.environ.get('BACKEND_PORT', 5001))
     host = os.environ.get('HOST', '0.0.0.0')
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     

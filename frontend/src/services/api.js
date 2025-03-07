@@ -3,8 +3,8 @@
  * Contains functions for making requests to the API endpoints.
  */
 
-// Use relative URL to work with the proxy configuration in package.json
-const API_URL = '/api';
+// Use environment variable if available, fallback to relative URL for proxy
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 /**
  * Make a GET request to the specified endpoint.

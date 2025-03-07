@@ -10,6 +10,7 @@ const SimulationList = () => {
   const [simulations, setSimulations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -80,6 +81,34 @@ const SimulationList = () => {
         } 
       } 
     });
+  };
+  
+  const handleDeleteSimulation = async (id) => {
+    if (window.confirm('Are you sure you want to delete this simulation? This action cannot be undone.')) {
+      try {
+        setDeleteInProgress(true);
+        const response = await unifiedSimulationApi.delete(id);
+        
+        if (response && response.status === 'success') {
+          // Remove the deleted simulation from the list
+          setSimulations(simulations.filter(sim => sim.id !== id));
+          
+          // Show success message
+          navigate(location.pathname, { 
+            replace: true, 
+            state: { message: 'Simulation deleted successfully' } 
+          });
+        } else {
+          console.error('Error deleting simulation:', response?.message || 'Unknown error');
+          setError(response?.message || 'Failed to delete simulation');
+        }
+        setDeleteInProgress(false);
+      } catch (err) {
+        console.error("Error deleting simulation:", err);
+        setError("Failed to delete simulation. Please try again later.");
+        setDeleteInProgress(false);
+      }
+    }
   };
   
   const loadMore = () => {
@@ -176,12 +205,22 @@ const SimulationList = () => {
                 </div>
                 
                 <div className="border-t border-gray-700 p-3 flex justify-between items-center">
-                  <button 
-                    className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
-                    onClick={() => handleViewSimulation(simulation.id)}
-                  >
-                    View Details →
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                      onClick={() => handleViewSimulation(simulation.id)}
+                    >
+                      View
+                    </button>
+                    
+                    <button 
+                      className="text-red-400 hover:text-red-300 font-medium transition-colors"
+                      onClick={() => handleDeleteSimulation(simulation.id)}
+                      disabled={deleteInProgress}
+                    >
+                      Delete
+                    </button>
+                  </div>
                   
                   <button 
                     className="border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 py-1 px-3 rounded-md text-sm transition-colors"

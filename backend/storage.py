@@ -543,24 +543,79 @@ def get_all_simulations() -> List[Dict[str, Any]]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    # First get the column names to ensure we map data correctly
+    cursor.execute('PRAGMA table_info(simulations)')
+    columns = {row[1]: idx for idx, row in enumerate(cursor.fetchall())}
+    
+    logging.info(f"Simulation table columns: {columns}")
+    
     cursor.execute('SELECT * FROM simulations ORDER BY timestamp DESC')
     rows = cursor.fetchall()
     
-    conn.close()
+    logging.info(f"Got {len(rows)} simulations")
+    if rows:
+        logging.info(f"First row has {len(rows[0])} columns")
     
+    # Convert rows to dictionaries
     simulations = []
     for row in rows:
-        simulations.append({
-            'id': row[0],
-            'timestamp': row[1],
-            'context_id': row[2],
-            'interaction_type': row[3],
-            'entity_ids': json.loads(row[4]),
-            'content': row[5],
-            'metadata': json.loads(row[6]) if row[6] else None,
-            'final_turn_number': row[7]
-        })
+        try:
+            simulation = {
+                'id': row[columns.get('id', 0)],
+                'timestamp': row[columns.get('timestamp', 1)],
+                'context_id': row[columns.get('context_id', 2)],
+                'interaction_type': row[columns.get('interaction_type', 3)],
+            }
+            
+            # Handle entity_ids
+            entity_ids_idx = columns.get('entity_ids', 4)
+            if entity_ids_idx < len(row) and row[entity_ids_idx]:
+                try:
+                    simulation['entity_ids'] = json.loads(row[entity_ids_idx])
+                except json.JSONDecodeError:
+                    logging.error(f"Failed to parse entity_ids JSON: {row[entity_ids_idx]}")
+                    simulation['entity_ids'] = []
+            else:
+                simulation['entity_ids'] = []
+            
+            # Handle content
+            content_idx = columns.get('content', 5)
+            if content_idx < len(row):
+                simulation['content'] = row[content_idx]
+            else:
+                simulation['content'] = ''
+            
+            # Handle metadata
+            metadata_idx = columns.get('metadata', 6)
+            if metadata_idx < len(row) and row[metadata_idx]:
+                try:
+                    simulation['metadata'] = json.loads(row[metadata_idx])
+                except json.JSONDecodeError:
+                    logging.error(f"Failed to parse metadata JSON: {row[metadata_idx]}")
+                    simulation['metadata'] = {}
+            else:
+                simulation['metadata'] = {}
+            
+            # Handle name if it exists
+            if 'name' in columns and columns['name'] < len(row):
+                simulation['name'] = row[columns['name']]
+            
+            # Handle final_turn_number if it exists
+            if 'final_turn_number' in columns and columns['final_turn_number'] < len(row):
+                try:
+                    simulation['final_turn_number'] = int(row[columns['final_turn_number']])
+                except (ValueError, TypeError):
+                    logging.error(f"Failed to parse final_turn_number: {row[columns['final_turn_number']]}")
+                    simulation['final_turn_number'] = 0
+            else:
+                simulation['final_turn_number'] = 0
+            
+            simulations.append(simulation)
+        except Exception as e:
+            logging.error(f"Error processing simulation row: {str(e)}")
+            logging.exception("Exception details:")
     
+    conn.close()
     return simulations
 
 
@@ -786,6 +841,12 @@ def get_simulations(
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    # Get table columns dynamically
+    cursor.execute("PRAGMA table_info(simulations)")
+    columns = {row[1]: idx for idx, row in enumerate(cursor.fetchall())}
+    
+    logging.info(f"Simulation table columns: {columns}")
+    
     query_parts = ['SELECT * FROM simulations']
     params = []
     where_clauses = []
@@ -831,22 +892,55 @@ def get_simulations(
     
     # Execute the query
     query = ' '.join(query_parts)
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    
-    # Convert rows to dictionaries
-    simulations = []
-    for row in rows:
-        simulations.append({
-            'id': row[0],
-            'created_at': row[1],
-            'context_id': row[2],
-            'interaction_type': row[3],
-            'entity_ids': json.loads(row[4]),
-            'result': row[5],
-            'metadata': json.loads(row[6]) if row[6] else None,
-            'final_turn_number': row[7]
-        })
-    
-    conn.close()
-    return simulations 
+    try:
+        logging.info(f"Executing query: {query} with params: {params}")
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        logging.info(f"Got {len(rows)} simulations")
+        if rows:
+            logging.info(f"First row has {len(rows[0])} columns")
+        
+        # Convert rows to dictionaries
+        simulations = []
+        for row in rows:
+            simulation = {
+                'id': row[columns.get('id', 0)],
+                'timestamp': row[columns.get('timestamp', 1)],
+                'context_id': row[columns.get('context_id', 2)],
+                'interaction_type': row[columns.get('interaction_type', 3)],
+                'entity_ids': json.loads(row[columns.get('entity_ids', 4)]) if row[columns.get('entity_ids', 4)] else [],
+                'content': row[columns.get('content', 5)] if len(row) > columns.get('content', 5) else '',
+            }
+            
+            # Handle optional columns
+            if 'metadata' in columns and len(row) > columns['metadata']:
+                metadata_str = row[columns['metadata']]
+                try:
+                    simulation['metadata'] = json.loads(metadata_str) if metadata_str else {}
+                except json.JSONDecodeError:
+                    logging.error(f"Failed to parse metadata JSON: {metadata_str}")
+                    simulation['metadata'] = {}
+            else:
+                simulation['metadata'] = {}
+                
+            if 'name' in columns and len(row) > columns['name']:
+                simulation['name'] = row[columns['name']]
+                
+            if 'final_turn_number' in columns and len(row) > columns['final_turn_number']:
+                try:
+                    simulation['final_turn_number'] = int(row[columns['final_turn_number']])
+                except (ValueError, TypeError):
+                    logging.error(f"Failed to parse final_turn_number: {row[columns['final_turn_number']]}")
+                    simulation['final_turn_number'] = 0
+            else:
+                simulation['final_turn_number'] = 0
+                
+            simulations.append(simulation)
+            
+        return simulations
+    except Exception as e:
+        logging.error(f"Error fetching simulations: {str(e)}")
+        return []
+    finally:
+        conn.close() 
