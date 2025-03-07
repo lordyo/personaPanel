@@ -223,6 +223,17 @@ const entityTypeApi = {
    * @returns {Promise} - Response indicating success or failure
    */
   delete: (id) => del(`/entity-types/${id}`),
+
+  /**
+   * Suggest dimensions for an entity type using LLM.
+   * 
+   * @param {string} name - The entity type name
+   * @param {string} description - The entity type description
+   * @param {number} n_dimensions - Number of dimensions to generate (optional)
+   * @returns {Promise} - The suggested dimensions
+   */
+  suggestDimensions: (name, description, n_dimensions = 5) => 
+    post('/entity-types/suggest-dimensions', { name, description, n_dimensions }),
 }
 
 // Entity Management

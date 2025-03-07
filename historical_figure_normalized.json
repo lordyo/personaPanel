@@ -1,0 +1,71 @@
+[
+  {
+    "name": "Birth Year",
+    "description": "The year the historical figure was born.",
+    "type": "int",
+    "min_value": 0,
+    "max_value": 2023,
+    "distribution": "uniform"
+  },
+  {
+    "name": "Death Year",
+    "description": "The year the historical figure passed away.",
+    "type": "int",
+    "min_value": 0,
+    "max_value": 2023,
+    "distribution": "uniform"
+  },
+  {
+    "name": "Field of Influence",
+    "description": "The primary area in which the historical figure made their mark (e.g., politics, science, arts).",
+    "type": "categorical",
+    "options": [
+      "Politics",
+      "Science",
+      "Arts",
+      "Society",
+      "Philosophy",
+      "Exploration"
+    ],
+    "distribution_values": {
+      "Politics": 0.16666666666666666,
+      "Science": 0.16666666666666666,
+      "Arts": 0.16666666666666666,
+      "Society": 0.16666666666666666,
+      "Philosophy": 0.16666666666666666,
+      "Exploration": 0.16666666666666666
+    }
+  },
+  {
+    "name": "Major Achievements",
+    "description": "Key accomplishments that define the historical figure's legacy.",
+    "type": "text"
+  },
+  {
+    "name": "Personality Traits",
+    "description": "Notable personality characteristics of the historical figure.",
+    "type": "text"
+  },
+  {
+    "name": "Cultural Impact",
+    "description": "The extent to which the historical figure influenced culture and society.",
+    "type": "float",
+    "min_value": 0,
+    "max_value": 10,
+    "distribution": "normal",
+    "spread_factor": 0.5
+  },
+  {
+    "name": "Controversial Aspects",
+    "description": "Any controversial actions or beliefs associated with the historical figure.",
+    "type": "boolean",
+    "options": null,
+    "distribution": "percentage",
+    "true_percentage": 0.5
+  },
+  {
+    "name": "Historical Context",
+    "description": "The socio-political environment during the historical figure's lifetime.",
+    "type": "text"
+  }
+]

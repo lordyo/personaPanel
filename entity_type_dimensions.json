@@ -1,0 +1,96 @@
+[
+  {
+    "name": "Character Class",
+    "description": "The character's class, such as warrior, mage, rogue, etc.",
+    "type": "categorical",
+    "options": [
+      "Warrior",
+      "Mage",
+      "Rogue",
+      "Cleric",
+      "Ranger",
+      "Bard",
+      "Paladin",
+      "Druid"
+    ],
+    "min_value": null,
+    "max_value": null,
+    "distribution": null
+  },
+  {
+    "name": "Race",
+    "description": "The fantasy race of the character, like human, elf, dwarf, etc.",
+    "type": "categorical",
+    "options": [
+      "Human",
+      "Elf",
+      "Dwarf",
+      "Orc",
+      "Halfling",
+      "Dragonborn",
+      "Tiefling",
+      "Gnome"
+    ],
+    "min_value": null,
+    "max_value": null,
+    "distribution": null
+  },
+  {
+    "name": "Strength",
+    "description": "The strength attribute of the character, affecting physical power.",
+    "type": "int",
+    "min_value": 1,
+    "max_value": 20,
+    "distribution": "normal"
+  },
+  {
+    "name": "Intelligence",
+    "description": "The intelligence attribute of the character, affecting spellcasting and problem-solving.",
+    "type": "int",
+    "min_value": 1,
+    "max_value": 20,
+    "distribution": "normal"
+  },
+  {
+    "name": "Charisma",
+    "description": "The charisma attribute of the character, affecting social interaction and influence.",
+    "type": "int",
+    "min_value": 1,
+    "max_value": 20,
+    "distribution": "normal"
+  },
+  {
+    "name": "Personality Traits",
+    "description": "Key personality traits that define the character's behavior.",
+    "type": "categorical",
+    "options": [
+      "Brave",
+      "Cunning",
+      "Compassionate",
+      "Ruthless",
+      "Honest",
+      "Deceitful",
+      "Loyal",
+      "Curious"
+    ],
+    "min_value": null,
+    "max_value": null,
+    "distribution": null
+  },
+  {
+    "name": "Background",
+    "description": "A brief background story or origin of the character.",
+    "type": "text",
+    "min_value": null,
+    "max_value": null,
+    "distribution": null
+  },
+  {
+    "name": "Agility",
+    "description": "The agility attribute, affecting dexterity and speed.",
+    "type": "int",
+    "min_value": 1,
+    "max_value": 20,
+    "distribution": "normal"
+  }
+]

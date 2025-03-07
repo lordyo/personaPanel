@@ -1,0 +1,70 @@
+{
+  "data": {
+    "description": "A notable person from history with significant impact on politics, science, arts, or society. Includes their background, achievements, personality, and historical context.",
+    "dimensions": [
+      {
+        "description": "The year the historical figure was born.",
+        "distribution": "uniform",
+        "max_value": 2023,
+        "min_value": 0,
+        "name": "Birth Year",
+        "type": "int"
+      },
+      {
+        "description": "The year the historical figure passed away.",
+        "distribution": "uniform",
+        "max_value": 2023,
+        "min_value": 0,
+        "name": "Death Year",
+        "type": "int"
+      },
+      {
+        "description": "The primary area in which the historical figure made their mark (e.g., politics, science, arts).",
+        "name": "Field of Influence",
+        "options": [
+          "Politics",
+          "Science",
+          "Arts",
+          "Society",
+          "Philosophy",
+          "Exploration"
+        ],
+        "type": "categorical"
+      },
+      {
+        "description": "Key accomplishments that define the historical figure's legacy.",
+        "name": "Major Achievements",
+        "type": "text"
+      },
+      {
+        "description": "Notable personality characteristics of the historical figure.",
+        "name": "Personality Traits",
+        "type": "text"
+      },
+      {
+        "description": "The extent to which the historical figure influenced culture and society.",
+        "distribution": "normal",
+        "max_value": 10,
+        "min_value": 0,
+        "name": "Cultural Impact",
+        "type": "float"
+      },
+      {
+        "description": "Any controversial actions or beliefs associated with the historical figure.",
+        "name": "Controversial Aspects",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "type": "boolean"
+      },
+      {
+        "description": "The socio-political environment during the historical figure's lifetime.",
+        "name": "Historical Context",
+        "type": "text"
+      }
+    ],
+    "name": "Historical Figure"
+  },
+  "status": "success"
+}

@@ -31,6 +31,7 @@ import storage as storage
 from core.templates import get_template_names, get_template
 from llm.simulation_modules import SoloInteractionSimulator, DyadicInteractionSimulator, GroupInteractionSimulator, LLMError
 from llm.interaction_module import InteractionSimulator
+from llm.entity_type_generator import generate_entity_type_dimensions
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -1699,6 +1700,100 @@ def update_settings():
     except Exception as e:
         logger.error(f"Error updating settings: {str(e)}")
         return jsonify({"error": f"Failed to update settings: {str(e)}"}), 400
+
+@app.route('/api/entity-types/suggest-dimensions', methods=['POST'])
+@handle_exceptions
+def suggest_entity_type_dimensions():
+    """
+    Generate dimensions for an entity type based on name and description.
+    
+    Request body:
+        name: Name of the entity type
+        description: Description of the entity type
+        n_dimensions: Number of dimensions to generate (optional, default: 5)
+        normalize: Whether to normalize dimensions for API compatibility (optional, default: True)
+        
+    Returns:
+        JSON response with the generated dimensions
+    """
+    data = request.json
+    
+    # Validate required fields
+    if not data or not data.get('name'):
+        return error_response("Entity type name is required")
+    
+    # Get parameters from request
+    entity_type_name = data.get('name')
+    entity_type_description = data.get('description', '')
+    n_dimensions = data.get('n_dimensions', 5)
+    normalize = data.get('normalize', True)
+    
+    # Validate n_dimensions
+    if not isinstance(n_dimensions, int) or n_dimensions < 1:
+        return error_response("n_dimensions must be a positive integer")
+    
+    # Generate dimensions
+    dimensions = generate_entity_type_dimensions(
+        entity_type_name=entity_type_name,
+        entity_type_description=entity_type_description,
+        n_dimensions=n_dimensions,
+        normalize=normalize
+    )
+    
+    # Return success response with dimensions
+    return success_response({
+        "name": entity_type_name,
+        "description": entity_type_description,
+        "dimensions": dimensions
+    })
+
+@app.route('/api/entity-types/generate-and-create', methods=['POST'])
+@handle_exceptions
+def generate_and_create_entity_type():
+    """
+    Generate dimensions and create a new entity type in one step.
+    
+    Request body:
+        name: Name of the entity type
+        description: Description of the entity type
+        n_dimensions: Number of dimensions to generate (optional, default: 5)
+        
+    Returns:
+        JSON response with the created entity type ID and dimensions
+    """
+    data = request.json
+    
+    # Validate required fields
+    if not data or not data.get('name'):
+        return error_response("Entity type name is required")
+    
+    # Get parameters from request
+    entity_type_name = data.get('name')
+    entity_type_description = data.get('description', '')
+    n_dimensions = data.get('n_dimensions', 5)
+    
+    # Validate n_dimensions
+    if not isinstance(n_dimensions, int) or n_dimensions < 1:
+        return error_response("n_dimensions must be a positive integer")
+    
+    # Generate normalized dimensions
+    dimensions = generate_entity_type_dimensions(
+        entity_type_name=entity_type_name,
+        entity_type_description=entity_type_description,
+        n_dimensions=n_dimensions,
+        normalize=True
+    )
+    
+    # Create the entity type
+    entity_type_id = storage.save_entity_type(entity_type_name, entity_type_description, dimensions)
+    
+    # Return success response with entity type ID and dimensions
+    return success_response({
+        "id": entity_type_id,
+        "name": entity_type_name,
+        "description": entity_type_description,
+        "dimensions": dimensions
+    })
 
 if __name__ == '__main__':
     # Use environment variable for port or default to 5001 (avoiding common 5000 port)

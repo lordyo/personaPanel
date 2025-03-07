@@ -1,0 +1,98 @@
+{
+  "data": {
+    "description": "A professional character representing various business roles and personalities, including executives, entrepreneurs, managers, and employees with different skills, backgrounds, and work styles.",
+    "dimensions": [
+      {
+        "description": "The specific role or position the persona holds within a business.",
+        "distribution": null,
+        "max_value": null,
+        "min_value": null,
+        "name": "Role Type",
+        "options": [
+          "Executive",
+          "Entrepreneur",
+          "Manager",
+          "Employee",
+          "Intern"
+        ],
+        "type": "categorical"
+      },
+      {
+        "description": "The level of expertise the persona possesses in their field.",
+        "distribution": null,
+        "max_value": null,
+        "min_value": null,
+        "name": "Skill Level",
+        "options": [
+          "Beginner",
+          "Intermediate",
+          "Advanced",
+          "Expert"
+        ],
+        "type": "categorical"
+      },
+      {
+        "description": "The preferred way the persona approaches their work tasks.",
+        "distribution": null,
+        "max_value": null,
+        "min_value": null,
+        "name": "Work Style",
+        "options": [
+          "Collaborative",
+          "Independent",
+          "Analytical",
+          "Creative"
+        ],
+        "type": "categorical"
+      },
+      {
+        "description": "The number of years the persona has worked in their respective industry.",
+        "distribution": "normal",
+        "max_value": 50,
+        "min_value": 0,
+        "name": "Industry Experience",
+        "options": null,
+        "type": "int"
+      },
+      {
+        "description": "The approach the persona takes in leading teams or projects.",
+        "distribution": null,
+        "max_value": null,
+        "min_value": null,
+        "name": "Leadership Style",
+        "options": [
+          "Autocratic",
+          "Democratic",
+          "Laissez-faire",
+          "Transformational"
+        ],
+        "type": "categorical"
+      },
+      {
+        "description": "The preferred method of communication for the persona.",
+        "distribution": null,
+        "max_value": null,
+        "min_value": null,
+        "name": "Communication Preference",
+        "options": [
+          "Email",
+          "Face-to-Face",
+          "Phone",
+          "Instant Messaging"
+        ],
+        "type": "categorical"
+      },
+      {
+        "description": "The persona's ability to adjust to new situations or changes in the workplace.",
+        "distribution": "normal",
+        "max_value": 10,
+        "min_value": 0,
+        "name": "Adaptability",
+        "options": null,
+        "type": "float"
+      }
+    ],
+    "name": "Business Persona"
+  },
+  "status": "success"
+}
