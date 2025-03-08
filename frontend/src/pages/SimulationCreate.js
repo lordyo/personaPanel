@@ -27,6 +27,8 @@ const SimulationCreate = () => {
   const [isContinuation, setIsContinuation] = useState(false);
   const [lastTurnNumber, setLastTurnNumber] = useState(0);
   const [previousInteraction, setPreviousInteraction] = useState('');
+  const [interactionType, setInteractionType] = useState('discussion');
+  const [language, setLanguage] = useState('English');
   
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -41,6 +43,22 @@ const SimulationCreate = () => {
       setPreviousInteraction(continuationData.content || '');
       setIsContinuation(true);
       setSimulationName(`Continuation ${new Date().toLocaleString()}`);
+      
+      // Try to get interaction_type and language from continuationData or its metadata
+      // First check if they exist at the top level
+      if (continuationData.interaction_type) {
+        setInteractionType(continuationData.interaction_type);
+      }
+      
+      if (continuationData.language) {
+        setLanguage(continuationData.language);
+      }
+      
+      // Then check if they're in metadata as a fallback
+      else if (continuationData.metadata) {
+        setInteractionType(continuationData.metadata.interaction_type || interactionType);
+        setLanguage(continuationData.metadata.language || language);
+      }
       
       if (continuationData.entity_ids && continuationData.entity_ids.length > 0) {
         setSelectedEntityIds(continuationData.entity_ids);
@@ -166,7 +184,9 @@ const SimulationCreate = () => {
         // Create continuation data
         const continuationOptions = {
           n_turns: nTurns,
-          simulation_rounds: simulationRounds
+          simulation_rounds: simulationRounds,
+          interaction_type: interactionType,
+          language: language
         };
         
         console.log("Continuing simulation with options:", continuationOptions);
@@ -179,6 +199,8 @@ const SimulationCreate = () => {
           entities: selectedEntityIds,
           n_turns: nTurns,
           simulation_rounds: simulationRounds,
+          interaction_type: interactionType,
+          language: language,
           metadata: {
             created_at: new Date().toISOString()
           }
@@ -346,6 +368,44 @@ const SimulationCreate = () => {
               className="bg-gray-700 text-white border border-gray-600 rounded-md p-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <p className="mt-1 text-gray-400 text-sm">Number of sequential LLM calls (1-5)</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2" htmlFor="interactionType">
+              Interaction Type
+            </label>
+            <input
+              id="interactionType"
+              type="text"
+              value={interactionType}
+              onChange={(e) => setInteractionType(e.target.value)}
+              className="bg-gray-700 text-white border border-gray-600 rounded-md p-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="discussion"
+            />
+            <p className="mt-1 text-gray-400 text-sm">
+              How entities interact (e.g., discussion, debate, trade, fight)
+              {isContinuation && " - You can change this for the continuation"}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2" htmlFor="language">
+              Language
+            </label>
+            <input
+              id="language"
+              type="text"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="bg-gray-700 text-white border border-gray-600 rounded-md p-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="English"
+            />
+            <p className="mt-1 text-gray-400 text-sm">
+              Output language for the interaction
+              {isContinuation && " - You can change this for the continuation"}
+            </p>
           </div>
         </div>
 

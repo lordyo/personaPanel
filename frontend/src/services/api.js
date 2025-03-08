@@ -425,6 +425,8 @@ const unifiedSimulationApi = {
    *   @param {number} [simulation.simulation_rounds=1] - Number of sequential LLM calls to make
    *   @param {Object} [simulation.metadata] - Optional metadata for the simulation
    *   @param {string} [simulation.name] - Optional name for the simulation
+   *   @param {string} [simulation.interaction_type="discussion"] - Type of interaction (e.g., discussion, debate, trade, fight)
+   *   @param {string} [simulation.language="English"] - Output language for the interaction
    * @returns {Promise} - The created simulation
    */
   create: (simulation) => post('/unified-simulations', simulation),
@@ -436,6 +438,8 @@ const unifiedSimulationApi = {
    * @param {Object} options - Continuation options
    *   @param {number} [options.n_turns=1] - Number of turns to generate per round
    *   @param {number} [options.simulation_rounds=1] - Number of sequential LLM calls to make
+   *   @param {string} [options.interaction_type="discussion"] - Type of interaction (e.g., discussion, debate, trade, fight)
+   *   @param {string} [options.language="English"] - Output language for the interaction
    * @returns {Promise} - The updated simulation
    */
   continue: (id, options) => post(`/unified-simulations/${id}/continue`, options),

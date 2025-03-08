@@ -114,8 +114,8 @@ def create_dynamic_signature(entity_type: str, entity_description: str, dimensio
         "variability": dspy.InputField(desc="The level of creativity to use (0=typical, 0.5=distinct, 1=unique)"),
         
         # Standard output fields - always present
-        "name": dspy.OutputField(desc="A unique and appropriate name for this entity"),
-        "backstory": dspy.OutputField(desc="A cohesive description and backstory of the entity that incorporates all the provided attributes")
+        "name": dspy.OutputField(desc="A name for this entity, based on the entity data provided"),
+        "backstory": dspy.OutputField(desc="A cohesive description of the entity that incorporates all the provided attributes")
     }
     
     # Add dynamic input fields based on dimensions

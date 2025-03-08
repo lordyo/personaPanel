@@ -660,6 +660,8 @@ def create_simulation():
         n_rounds: Number of rounds to simulate (default: 1)
         last_round_number: Number of the last round (for continuations)
         previous_interaction: Previous interaction (for continuations)
+        interaction_type_detail: Type of interaction in detail (e.g., talk, play, trade, fight, default: "discussion")
+        language: Language for the output (default: "English")
         
     Returns:
         JSON response with the simulation ID and result
@@ -677,6 +679,8 @@ def create_simulation():
     n_rounds = data.get('n_rounds', 1)  # Default to 1 round if not specified
     last_round_number = data.get('last_round_number', 0)  # For continuations
     previous_interaction = data.get('previous_interaction', None)  # For continuations
+    interaction_type_detail = data.get('interaction_type_detail', 'discussion')  # Detailed interaction type
+    language = data.get('language', 'English')  # Output language
     
     # Validate interaction type
     if interaction_type not in ['solo', 'dyadic', 'group']:
@@ -720,7 +724,9 @@ def create_simulation():
         context=context_desc,
         n_turns=n_rounds,
         last_turn_number=last_round_number,
-        previous_interaction=previous_interaction
+        previous_interaction=previous_interaction,
+        interaction_type=interaction_type_detail,
+        language=language
     )
     
     # Extract the content from the prediction
@@ -1033,6 +1039,8 @@ def create_unified_simulation():
         simulation_rounds: Number of sequential LLM calls to make (default: 1)
         metadata: Optional metadata for the simulation
         name: Optional name for the simulation
+        interaction_type: Optional type of interaction (e.g., talk, play, trade, fight, default: "discussion")
+        language: Optional language for the output (default: "English")
     
     Returns:
         JSON response with simulation details
@@ -1046,6 +1054,8 @@ def create_unified_simulation():
     simulation_rounds = int(data.get('simulation_rounds', 1))
     metadata = data.get('metadata', {})
     simulation_name = data.get('name')
+    interaction_type_param = data.get('interaction_type', 'discussion')
+    language = data.get('language', 'English')
     
     # Validate inputs
     if not context_desc:
@@ -1065,13 +1075,13 @@ def create_unified_simulation():
             return error_response(f"Entity with ID {entity_id} not found", 404)
         entities.append(entity)
     
-    # Determine interaction type
+    # Determine entity count interaction type
     if len(entities) == 1:
-        interaction_type = "solo"
+        entity_count_type = "solo"
     elif len(entities) == 2:
-        interaction_type = "dyadic"
+        entity_count_type = "dyadic"
     else:
-        interaction_type = "group"
+        entity_count_type = "group"
     
     # Initialize the simulator
     simulator = InteractionSimulator()
@@ -1080,7 +1090,9 @@ def create_unified_simulation():
     result = simulator.forward(
         entities=entities,
         context=context_desc,
-        n_turns=n_turns
+        n_turns=n_turns,
+        interaction_type=interaction_type_param,
+        language=language
     )
     
     content = result.content
@@ -1094,7 +1106,9 @@ def create_unified_simulation():
             context=context_desc,
             n_turns=n_turns,
             last_turn_number=final_turn_number,
-            previous_interaction=content
+            previous_interaction=content,
+            interaction_type=interaction_type_param,
+            language=language
         )
         
         # Append the new content
@@ -1111,14 +1125,14 @@ def create_unified_simulation():
         entity_names = [entity.get('name', 'Unknown') for entity in entities]
         if len(entity_names) <= 3:
             combined_names = ", ".join(entity_names)
-            simulation_name = f"{interaction_type.capitalize()} interaction: {combined_names}"
+            simulation_name = f"{entity_count_type.capitalize()} {interaction_type_param} interaction: {combined_names}"
         else:
-            simulation_name = f"{interaction_type.capitalize()} interaction with {len(entity_names)} entities"
+            simulation_name = f"{entity_count_type.capitalize()} {interaction_type_param} interaction with {len(entity_names)} entities"
     
     # Save the simulation
     simulation_id = storage.save_simulation(
         context_id=context_id,
-        interaction_type=interaction_type,
+        interaction_type=entity_count_type,
         entity_ids=entity_ids,
         content=content,
         metadata=metadata,
@@ -1131,7 +1145,7 @@ def create_unified_simulation():
         "id": simulation_id,
         "context_id": context_id,
         "result": content,
-        "interaction_type": interaction_type,
+        "interaction_type": entity_count_type,
         "entity_count": len(entities),
         "final_turn_number": final_turn_number
     })
@@ -1346,6 +1360,12 @@ def continue_unified_simulation(simulation_id):
     Args:
         simulation_id: The ID of the simulation to continue
         
+    Request body:
+        n_turns: Number of turns to generate in each round (default: 1)
+        simulation_rounds: Number of sequential LLM calls to make (default: 1)
+        interaction_type: Optional type of interaction (e.g., talk, play, trade, fight, default: "discussion")
+        language: Optional language for the output (default: "English")
+        
     Returns:
         JSON response with the updated simulation
     """
@@ -1362,6 +1382,8 @@ def continue_unified_simulation(simulation_id):
     data = request.json
     n_turns = data.get('n_turns', 1)
     simulation_rounds = data.get('simulation_rounds', 1)
+    interaction_type = data.get('interaction_type', 'discussion')
+    language = data.get('language', 'English')
     
     # Get the context
     context = storage.get_context(simulation['context_id'])
@@ -1414,7 +1436,9 @@ def continue_unified_simulation(simulation_id):
             context=context_str,
             n_turns=n_turns,
             last_turn_number=final_turn_number,
-            previous_interaction=final_content
+            previous_interaction=final_content,
+            interaction_type=interaction_type,
+            language=language
         )
         
         # Append the new content

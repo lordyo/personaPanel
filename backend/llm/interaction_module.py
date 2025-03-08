@@ -79,9 +79,15 @@ class InteractionSignature(dspy.Signature):
     previous_interaction: Optional[str] = dspy.InputField(
         desc="Previous interaction content, if this is a continuation"
     )
+    interaction_type: str = dspy.InputField(
+        desc="Type of interaction between entities (e.g., talk, play, trade, fight)"
+    )
+    language: str = dspy.InputField(
+        desc="Language to use for the output interaction"
+    )
     
     content: str = dspy.OutputField(
-        desc="Interaction content with inner thoughts and dialogue for each entity across all turns"
+        desc="Interaction content for each entity across all turns"
     )
     final_turn_number: int = dspy.OutputField(
         desc="The number of the last turn generated in this call"
@@ -95,7 +101,7 @@ class InteractionSimulator(dspy.Module):
         self.predictor = dspy.Predict(InteractionSignature)
     
     @retry_on_error
-    def forward(self, entities, context, n_turns=1, last_turn_number=0, previous_interaction=None):
+    def forward(self, entities, context, n_turns=1, last_turn_number=0, previous_interaction=None, interaction_type="discussion", language="English"):
         """Generate interactions between entities.
         
         Args:
@@ -104,6 +110,8 @@ class InteractionSimulator(dspy.Module):
             n_turns: Number of dialogue turns to generate in this call
             last_turn_number: The last turn number from previous calls
             previous_interaction: Previous interaction content if continuing
+            interaction_type: Type of interaction between entities (e.g., talk, play, trade, fight)
+            language: Language to use for the output interaction
             
         Returns:
             dspy.Prediction with content and final_turn_number
@@ -117,7 +125,9 @@ class InteractionSimulator(dspy.Module):
             context=context,
             n_turns=n_turns,
             last_turn_number=last_turn_number,
-            previous_interaction=previous_interaction
+            previous_interaction=previous_interaction,
+            interaction_type=interaction_type,
+            language=language
         )
         
         return result 
