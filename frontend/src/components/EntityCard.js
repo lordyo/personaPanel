@@ -33,9 +33,10 @@ const EntityCard = ({
     
     // Add any numerical attributes that might be interesting
     Object.entries(attributes).forEach(([key, value]) => {
-      // Skip long text fields and private fields
+      // Skip long text fields, private fields, and backstory (since it's redundant with description)
       if (typeof value === 'string' && value.length > 50) return;
       if (key.startsWith('_')) return;
+      if (key === 'backstory') return; // Skip backstory as it's redundant with description
       
       // Format the value for display
       let displayValue = value;

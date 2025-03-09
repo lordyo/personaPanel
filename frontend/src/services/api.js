@@ -5,6 +5,7 @@
 
 // Use environment variable if available, fallback to relative URL for proxy
 const API_URL = process.env.REACT_APP_API_URL || '/api';
+console.log('API_URL is:', API_URL);
 
 /**
  * Make a GET request to the specified endpoint.
@@ -13,8 +14,18 @@ const API_URL = process.env.REACT_APP_API_URL || '/api';
  * @returns {Promise} - The response data or error
  */
 async function get(endpoint) {
+  let url = endpoint;
+  // Ensure we have a proper URL by combining API_URL with endpoint
+  if (!endpoint.startsWith('http') && !endpoint.startsWith('/')) {
+    url = `${API_URL}/${endpoint}`;
+  } else if (!endpoint.startsWith('http')) {
+    url = `${API_URL}${endpoint}`;
+  }
+  
+  console.log(`GET request to: ${url}`);
+  
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -64,8 +75,19 @@ async function get(endpoint) {
  * @returns {Promise} - The response data or error
  */
 async function post(endpoint, body) {
+  let url = endpoint;
+  // Ensure we have a proper URL by combining API_URL with endpoint
+  if (!endpoint.startsWith('http') && !endpoint.startsWith('/')) {
+    url = `${API_URL}/${endpoint}`;
+  } else if (!endpoint.startsWith('http')) {
+    url = `${API_URL}${endpoint}`;
+  }
+  
+  console.log(`POST request to: ${url}`);
+  console.log(`POST body: ${JSON.stringify(body, null, 2)}`);
+  
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -254,8 +276,11 @@ const entityApi = {
    */
   getByType: async (entityTypeId) => {
     try {
-      const result = await get(`/entity-types/${entityTypeId}/entities`);
-      return result;
+      const response = await get(`/entity-types/${entityTypeId}/entities`);
+      
+      // Extract entities from the response, handling both formats
+      // API might return { status: "success", data: [...] } or just the array directly
+      return response.data || response;
     } catch (error) {
       console.warn(`Error fetching entities for type ${entityTypeId}:`, error);
       // For corrupted entity types, return an empty array instead of propagating the error
@@ -315,6 +340,55 @@ const entityApi = {
    * @returns {Promise} - Response with count of deleted entities
    */
   deleteByType: (entityTypeId) => del(`/entity-types/${entityTypeId}/entities`),
+
+  /**
+   * Generate multiple diverse entities in a single batch request.
+   * This provides better diversity between entities than generating them individually.
+   * 
+   * @param {string} entityTypeId - The entity type id
+   * @param {number} batchSize - Number of entities to generate in batch (1-10)
+   * @param {number} variability - Variability level (0-1)
+   * @param {string} entityDescription - Optional description to guide entity generation
+   * @returns {Promise} - The generated batch of entities
+   */
+  generateEntityBatch: (entityTypeId, batchSize = 5, variability = 0.7, entityDescription = '') => {
+    // Find the entity type to get its dimensions and other metadata
+    return get(`/entity-types/${entityTypeId}`)
+      .then(response => {
+        // Extract the actual entity type data from the response
+        // API returns { status: "success", data: {...} }
+        const entityType = response.data || response;
+        
+        // Check if entity type exists
+        if (!entityType) {
+          throw new Error('Entity type not found');
+        }
+        
+        // Check for dimensions
+        if (!entityType.dimensions || !Array.isArray(entityType.dimensions) || entityType.dimensions.length === 0) {
+          throw new Error('Entity type must have dimensions');
+        }
+        
+        // Prepare data for batch generation
+        const requestData = {
+          entity_type: entityType.name,
+          entity_description: entityDescription || entityType.description,
+          dimensions: entityType.dimensions || [],
+          batch_size: batchSize,
+          variability: variability,
+          output_fields: entityType.output_fields || []
+        };
+        
+        // The API_URL already includes "/api", so we don't need to add it again
+        const endpoint = 'batch-entities/generate';
+        return post(endpoint, requestData)
+          .then(response => {
+            // Return response as-is without wrapping in data
+            // The batch API already includes status and entities
+            return response;
+          });
+      });
+  },
 }
 
 // Template Management
@@ -472,6 +546,7 @@ const api = {
   createEntity: entityApi.create,
   updateEntity: entityApi.update,
   generateEntities: entityApi.generateEntities,
+  generateEntityBatch: entityApi.generateEntityBatch,
   deleteEntity: entityApi.delete,
   deleteEntitiesByType: entityApi.deleteByType,
   

@@ -191,21 +191,53 @@ const EntityList = () => {
       
       console.log("Generating entities with form data:", formData);
       
-      const response = await api.generateEntities(
-        formData.entityTypeId,
-        formData.count,
-        formData.variability,
-        formData.entityDescription
-      );
+      let response;
       
-      console.log("Generation response:", response);
+      // Check if we should use batch generation for more diverse entities
+      if (formData.useBatchGeneration && formData.count > 1) {
+        // Use batch generation for multiple entities
+        console.log("Using batch generation API for diverse entities");
+        
+        // The batch size is limited to MAX_PARALLEL_ENTITIES (default: 10)
+        // If more entities are requested, we'll make multiple batch requests
+        const batchSize = Math.min(formData.count, 10); // Assuming MAX_PARALLEL_ENTITIES is 10
+        
+        response = await api.generateEntityBatch(
+          formData.entityTypeId,
+          batchSize, 
+          formData.variability,
+          formData.entityDescription
+        );
+        
+        console.log("Batch generation response:", response);
+      } else {
+        // Use standard entity generation
+        console.log("Using standard entity generation API");
+        
+        response = await api.generateEntities(
+          formData.entityTypeId,
+          formData.count,
+          formData.variability,
+          formData.entityDescription
+        );
+        
+        console.log("Generation response:", response);
+      }
       
       if (response.status === 'success') {
         // Check if the response has entities directly in it
+        // Handle different response formats: either entities at the top level or nested in data
+        let newEntities = [];
+        
         if (response.data && response.data.entities && Array.isArray(response.data.entities)) {
-          // Use the entities directly from the response
-          const newEntities = response.data.entities;
-          
+          // Format 1: Entities nested in 'data' property
+          newEntities = response.data.entities;
+        } else if (response.entities && Array.isArray(response.entities)) {
+          // Format 2: Entities at the top level
+          newEntities = response.entities;
+        }
+        
+        if (newEntities.length > 0) {
           // Add entity_type_name to each entity for display purposes
           const processedEntities = newEntities.map(entity => ({
             ...entity,
@@ -216,28 +248,42 @@ const EntityList = () => {
           console.log("Processed entities:", processedEntities);
           
           // Update the entities state
-          setEntities(prev => {
+          setEntities(prevEntities => {
             // Filter out any entities of this type that might have the same ID
             // This ensures we don't have duplicates
-            const existingEntitiesFiltered = prev.filter(entity => 
+            const existingEntitiesFiltered = prevEntities.filter(entity => 
               !processedEntities.some(newEntity => newEntity.id === entity.id)
             );
-            return [...existingEntitiesFiltered, ...processedEntities];
+            
+            // Create new entities list with the processed entities added
+            const updatedEntities = [...existingEntitiesFiltered, ...processedEntities];
+            
+            // Update filtered entities when we add new entities
+            setFilteredEntities(prevFiltered => {
+              if (filterTypeId && filterTypeId !== formData.entityTypeId) {
+                // Keep the current filtered list if we're filtering by a different type
+                return prevFiltered;
+              } else {
+                // Otherwise update the filtered list as well (either no filter or same type)
+                return updatedEntities;
+              }
+            });
+            
+            return updatedEntities;
           });
+          
+          setError(null);
         } else {
-          // Fallback - refetch all entities if we don't get them directly
+          // Fallback - refetch all entities if we don't get entities directly
           await fetchData();
         }
-        
-        // Clear any previous error
-        setError(null);
       } else {
-        console.error("Error response from generate entities:", response);
-        setError(response.message || 'Failed to generate entities');
+        // Handle error in response
+        setError(`Error: ${response.message || 'Failed to generate entities'}`);
       }
     } catch (err) {
       console.error("Error generating entities:", err);
-      setError("Failed to generate entities: " + (err.message || ""));
+      setError(`Error generating entities: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }

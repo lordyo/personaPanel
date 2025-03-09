@@ -114,7 +114,16 @@ const SimulationCreate = () => {
         const response = await entityApi.getByType(entityTypeId);
         console.log("Entities response:", response);
         
-        if (response && response.status === 'success') {
+        // Handle both array response and {status, data} response formats
+        if (Array.isArray(response)) {
+          // Response is already an array of entities
+          setEntities(prev => ({
+            ...prev,
+            [entityTypeId]: response
+          }));
+          setError(null);
+        } else if (response && response.status === 'success') {
+          // Response is in {status, data} format
           setEntities(prev => ({
             ...prev,
             [entityTypeId]: response.data || []

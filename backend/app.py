@@ -35,6 +35,9 @@ from llm.entity_type_generator import generate_entity_type_dimensions
 # Import the batch entity routes
 from api.batch_entity_routes import batch_entity_bp
 
+# Import the batch simulation routes
+from api.batch_simulation_routes import batch_simulation_bp
+
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
 
@@ -88,8 +91,11 @@ app = Flask(__name__)
 # Configure CORS to allow cross-origin requests from the frontend
 CORS(app, supports_credentials=True)
 
-# Register the batch entity routes blueprint
+# Register the batch entity routes blueprint with proper URL prefix
 app.register_blueprint(batch_entity_bp, url_prefix='/api/batch-entities')
+
+# Register the batch simulation routes blueprint with proper URL prefix
+app.register_blueprint(batch_simulation_bp, url_prefix='/api/batch-simulations')
 
 # Initialize database
 @app.before_first_request

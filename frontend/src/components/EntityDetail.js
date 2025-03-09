@@ -47,6 +47,9 @@ const EntityDetail = ({ entity, entityType, onClose, onSave }) => {
     const otherAttrs = [];
     
     Object.entries(entity.attributes).forEach(([key, value]) => {
+      // Skip backstory as it's redundant with description
+      if (key === 'backstory') return;
+      
       // If it's a string and longer than 50 characters, treat as text
       if (typeof value === 'string' && value.length > 50) {
         textAttrs.push([key, value]);

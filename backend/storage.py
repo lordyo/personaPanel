@@ -89,6 +89,36 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_simulations_context_id ON simulations(context_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_simulations_timestamp ON simulations(timestamp)')
     
+    # Create simulation_batches table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS simulation_batches (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        description TEXT,
+        context TEXT NOT NULL,
+        metadata TEXT,  -- JSON string
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+    ''')
+    
+    # Create batch_simulations table for the many-to-many relationship
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS batch_simulations (
+        batch_id TEXT NOT NULL,
+        simulation_id TEXT NOT NULL,
+        sequence_number INTEGER NOT NULL,
+        PRIMARY KEY (batch_id, simulation_id),
+        FOREIGN KEY (batch_id) REFERENCES simulation_batches (id) ON DELETE CASCADE,
+        FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
+    )
+    ''')
+    
+    # Create indices for simulation batches
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_batch_simulations_batch_id ON batch_simulations(batch_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_batch_simulations_simulation_id ON batch_simulations(simulation_id)')
+    
     conn.commit()
     conn.close()
 
@@ -987,6 +1017,305 @@ def delete_entity_type(entity_type_id: str) -> bool:
     except Exception as e:
         print(f"Error deleting entity type: {e}")
         conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
+# Batch Simulation Functions
+
+def create_simulation_batch(
+    name: str,
+    description: Optional[str],
+    context: str,
+    metadata: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Create a new simulation batch.
+    
+    Args:
+        name: Name of the batch
+        description: Optional description of the batch
+        context: The context used for all simulations in this batch
+        metadata: Optional metadata dictionary
+        
+    Returns:
+        ID of the created batch
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    batch_id = str(uuid.uuid4())
+    timestamp = datetime.datetime.now().isoformat()
+    
+    cursor.execute(
+        'INSERT INTO simulation_batches VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        (
+            batch_id,
+            name,
+            timestamp,
+            description,
+            context,
+            json.dumps(metadata) if metadata else None,
+            'pending',  # Initial status
+            datetime.datetime.now().isoformat()
+        )
+    )
+    
+    conn.commit()
+    conn.close()
+    return batch_id
+
+def add_simulation_to_batch(batch_id: str, simulation_id: str, sequence_number: int) -> bool:
+    """
+    Add a simulation to a batch.
+    
+    Args:
+        batch_id: ID of the batch
+        simulation_id: ID of the simulation to add
+        sequence_number: Sequence number for ordering simulations in the batch
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            'INSERT INTO batch_simulations VALUES (?, ?, ?)',
+            (batch_id, simulation_id, sequence_number)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        logger = logging.getLogger('app')
+        logger.error(f"Error adding simulation {simulation_id} to batch {batch_id}: {str(e)}")
+        return False
+    finally:
+        conn.close()
+
+def update_batch_status(batch_id: str, status: str) -> bool:
+    """
+    Update the status of a simulation batch.
+    
+    Args:
+        batch_id: ID of the batch
+        status: New status ('pending', 'in_progress', 'completed', 'failed')
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            'UPDATE simulation_batches SET status = ? WHERE id = ?',
+            (status, batch_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        conn.rollback()
+        logger = logging.getLogger('app')
+        logger.error(f"Error updating batch {batch_id} status: {str(e)}")
+        return False
+    finally:
+        conn.close()
+
+def get_simulation_batch(batch_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get a simulation batch by ID.
+    
+    Args:
+        batch_id: ID of the batch to retrieve
+        
+    Returns:
+        Batch dictionary or None if not found
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Get the batch
+    cursor.execute('SELECT * FROM simulation_batches WHERE id = ?', (batch_id,))
+    batch_row = cursor.fetchone()
+    
+    if not batch_row:
+        conn.close()
+        return None
+    
+    # Get all simulations in the batch
+    cursor.execute('''
+        SELECT s.*, bs.sequence_number 
+        FROM simulations s
+        JOIN batch_simulations bs ON s.id = bs.simulation_id
+        WHERE bs.batch_id = ?
+        ORDER BY bs.sequence_number
+    ''', (batch_id,))
+    
+    simulation_rows = cursor.fetchall()
+    
+    conn.close()
+    
+    # Get column names for both tables
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('PRAGMA table_info(simulation_batches)')
+    batch_columns = [col[1] for col in cursor.fetchall()]
+    
+    cursor.execute('PRAGMA table_info(simulations)')
+    simulation_columns = [col[1] for col in cursor.fetchall()]
+    
+    conn.close()
+    
+    # Create batch dictionary
+    batch = {}
+    for i, column in enumerate(batch_columns):
+        if column == 'metadata':
+            batch[column] = json.loads(batch_row[i]) if batch_row[i] else None
+        else:
+            batch[column] = batch_row[i]
+    
+    # Create simulations list
+    simulations = []
+    for row in simulation_rows:
+        simulation = {}
+        for i, column in enumerate(simulation_columns):
+            if i < len(row) - 1:  # Exclude the last column which is sequence_number
+                if column == 'entity_ids':
+                    simulation[column] = json.loads(row[i]) if row[i] else []
+                elif column == 'metadata':
+                    simulation[column] = json.loads(row[i]) if row[i] else None
+                else:
+                    simulation[column] = row[i]
+        
+        # Add sequence number
+        simulation['sequence_number'] = row[-1]
+        simulations.append(simulation)
+    
+    batch['simulations'] = simulations
+    
+    return batch
+
+def get_all_simulation_batches(include_simulations: bool = False) -> List[Dict[str, Any]]:
+    """
+    Get all simulation batches.
+    
+    Args:
+        include_simulations: Whether to include the simulations in each batch
+        
+    Returns:
+        List of batch dictionaries
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM simulation_batches ORDER BY timestamp DESC')
+    batch_rows = cursor.fetchall()
+    
+    # Get column names
+    cursor.execute('PRAGMA table_info(simulation_batches)')
+    batch_columns = [col[1] for col in cursor.fetchall()]
+    
+    if include_simulations:
+        cursor.execute('PRAGMA table_info(simulations)')
+        simulation_columns = [col[1] for col in cursor.fetchall()]
+    
+    batches = []
+    for batch_row in batch_rows:
+        # Create batch dictionary
+        batch = {}
+        for i, column in enumerate(batch_columns):
+            if column == 'metadata':
+                batch[column] = json.loads(batch_row[i]) if batch_row[i] else None
+            else:
+                batch[column] = batch_row[i]
+        
+        if include_simulations:
+            # Get all simulations in the batch
+            cursor.execute('''
+                SELECT s.*, bs.sequence_number 
+                FROM simulations s
+                JOIN batch_simulations bs ON s.id = bs.simulation_id
+                WHERE bs.batch_id = ?
+                ORDER BY bs.sequence_number
+            ''', (batch[batch_columns[0]],))  # Use first column as ID
+            
+            simulation_rows = cursor.fetchall()
+            
+            # Create simulations list
+            simulations = []
+            for row in simulation_rows:
+                simulation = {}
+                for i, column in enumerate(simulation_columns):
+                    if i < len(row) - 1:  # Exclude the last column which is sequence_number
+                        if column == 'entity_ids':
+                            simulation[column] = json.loads(row[i]) if row[i] else []
+                        elif column == 'metadata':
+                            simulation[column] = json.loads(row[i]) if row[i] else None
+                        else:
+                            simulation[column] = row[i]
+                
+                # Add sequence number
+                simulation['sequence_number'] = row[-1]
+                simulations.append(simulation)
+            
+            batch['simulations'] = simulations
+        
+        batches.append(batch)
+    
+    conn.close()
+    
+    return batches
+
+def delete_simulation_batch(batch_id: str) -> bool:
+    """
+    Delete a simulation batch and all its associated simulations.
+    
+    Args:
+        batch_id: The ID of the batch to delete
+        
+    Returns:
+        True if the batch was deleted, False if not found
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Start a transaction
+        conn.execute('BEGIN TRANSACTION')
+        
+        # Check if batch exists
+        cursor.execute('SELECT id FROM simulation_batches WHERE id = ?', (batch_id,))
+        if cursor.fetchone() is None:
+            conn.rollback()
+            return False
+        
+        # Get all simulation IDs in the batch
+        cursor.execute('SELECT simulation_id FROM batch_simulations WHERE batch_id = ?', (batch_id,))
+        simulation_ids = [row[0] for row in cursor.fetchall()]
+        
+        # Delete all associated simulations
+        for sim_id in simulation_ids:
+            cursor.execute('DELETE FROM simulations WHERE id = ?', (sim_id,))
+        
+        # Delete all batch-simulation associations
+        cursor.execute('DELETE FROM batch_simulations WHERE batch_id = ?', (batch_id,))
+        
+        # Delete the batch
+        cursor.execute('DELETE FROM simulation_batches WHERE id = ?', (batch_id,))
+        
+        # Commit the transaction
+        conn.commit()
+        return True
+    except Exception as e:
+        # Rollback on error
+        conn.rollback()
+        logger = logging.getLogger('app')
+        logger.error(f"Error deleting batch {batch_id}: {str(e)}")
         return False
     finally:
         conn.close() 
