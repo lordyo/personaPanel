@@ -103,19 +103,16 @@ def create_dynamic_signature(entity_type: str, entity_description: str, dimensio
     attributes = {
         "__doc__": f"""
         Generate a cohesive and believable entity based on the provided attributes.
-        
-        Entity Type: {entity_type}
-        Description: {entity_description}
         """,
         
         # Standard input fields
-        "entity_type": dspy.InputField(desc=f"The entity type: {entity_type}"),
-        "entity_description": dspy.InputField(desc=f"Description of the entity type: {entity_description}"),
-        "variability": dspy.InputField(desc="The level of creativity to use (0=typical, 0.5=distinct, 1=unique)"),
+        "entity_type": dspy.InputField(desc=f"The entity type."),
+        "entity_description": dspy.InputField(desc=f"Description of the entity type."),
+        "variability": dspy.InputField(desc="The level of creativity to use (0=typical, 0.5=distinct, 1=unusual)"),
         
         # Standard output fields - always present
-        "name": dspy.OutputField(desc="A name for this entity, based on the entity data provided"),
-        "backstory": dspy.OutputField(desc="A cohesive description of the entity that incorporates all the provided attributes")
+        "name": dspy.OutputField(desc="A fitting name for this entity, strongly influenced by the provided attributes."),
+        "backstory": dspy.OutputField(desc="A cohesive description of the entity that reflects the provided attributes")
     }
     
     # Add dynamic input fields based on dimensions
