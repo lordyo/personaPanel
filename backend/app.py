@@ -23,6 +23,10 @@ import copy
 # Load environment variables from .env file
 load_dotenv()
 
+# Constants for configuration
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5000')
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+
 # Import modules
 from core.entity import EntityType, EntityInstance, Dimension
 from core.simulation import SimulationEngine, Context, InteractionType
@@ -90,6 +94,16 @@ app = Flask(__name__)
 
 # Configure CORS to allow cross-origin requests from the frontend
 CORS(app, supports_credentials=True)
+
+# Configure explicit CORS options for specific routes
+@app.after_request
+def after_request(response):
+    if request.method == 'OPTIONS':
+        response.headers.add('Access-Control-Allow-Headers', '*')
+        response.headers.add('Access-Control-Allow-Methods', '*')
+        response.headers.add('Access-Control-Allow-Origin', FRONTEND_URL)
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 # Register the batch entity routes blueprint with proper URL prefix
 app.register_blueprint(batch_entity_bp, url_prefix='/api/batch-entities')
@@ -642,6 +656,57 @@ def get_entity(entity_id):
         return error_response(f"Entity with ID {entity_id} not found", 404)
     
     return success_response(entity)
+
+@app.route('/api/entities/<entity_id>', methods=['PUT'])
+@handle_exceptions
+def update_entity(entity_id):
+    """
+    Update an entity by ID.
+    
+    Args:
+        entity_id: ID of the entity to update
+        
+    Request body:
+        name: New name for the entity (optional)
+        description: New description for the entity (optional)
+        attributes: New attributes for the entity (optional)
+        properties: New properties for the entity (treated same as attributes, for frontend compatibility)
+        
+    Returns:
+        JSON response with the updated entity
+    """
+    data = request.json
+    
+    if not data:
+        return error_response("Request body is required", 400)
+    
+    # Get the current entity
+    entity = storage.get_entity(entity_id)
+    if not entity:
+        return error_response(f"Entity with ID {entity_id} not found", 404)
+    
+    # Get updated fields or use current values
+    name = data.get('name', entity['name'])
+    description = data.get('description', entity['description'])
+    
+    # Handle both attributes and properties keys for frontend compatibility
+    attributes = entity['attributes']
+    if 'attributes' in data:
+        attributes = data['attributes']
+    elif 'properties' in data:
+        attributes = data['properties']
+    
+    # Update the entity
+    success = storage.update_entity(entity_id, name, description, attributes)
+    
+    if not success:
+        return error_response(f"Failed to update entity with ID {entity_id}", 500)
+    
+    # Get the updated entity data
+    updated_entity = storage.get_entity(entity_id)
+    logger.info(f"Updated entity: {name} (ID: {entity_id})")
+    
+    return success_response(updated_entity)
 
 @app.route('/api/entity-types/<entity_type_id>/entities', methods=['GET'])
 @handle_exceptions

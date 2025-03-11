@@ -88,6 +88,7 @@ const EntityDetail = ({ entity, entityType, onClose, onSave }) => {
       .then(() => {
         setIsEditing(false);
         setIsSaving(false);
+        onClose();
       })
       .catch(err => {
         console.error("Error saving entity:", err);

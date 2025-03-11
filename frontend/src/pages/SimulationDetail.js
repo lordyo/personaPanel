@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { unifiedSimulationApi } from '../services/api';
 import LoadingIndicator from '../components/LoadingIndicator';
 
@@ -9,6 +9,10 @@ import LoadingIndicator from '../components/LoadingIndicator';
 const SimulationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Get active tab from location state, default to individual
+  const activeTab = location.state?.activeTab || 'individual';
+  
   const [simulation, setSimulation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -45,7 +49,10 @@ const SimulationDetail = () => {
   }, [id]);
 
   const handleBack = () => {
-    navigate('/simulations');
+    // Navigate back to simulations list with active tab preserved
+    navigate('/simulations', {
+      state: { activeTab }
+    });
   };
   
   const handleOpenContinueDialog = () => {

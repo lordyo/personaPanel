@@ -166,6 +166,10 @@ const EntityList = () => {
         setViewingEntity(result);
       }
       
+      // Clear editing state to hide any empty modals
+      setEditingEntity(null);
+      setEditingEntityType(null);
+      
       setError(null);
       return Promise.resolve(result);
     } catch (err) {

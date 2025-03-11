@@ -142,18 +142,120 @@ async def run_simulation_async(
     context_id = str(uuid.uuid4())
     storage.save_context(context_id, context)
     
-    # Run the simulation in a separate thread
+    # Create a temporary file to store the simulation input and output
+    import tempfile
+    import subprocess
+    
     try:
-        # Run the simulation using run_simulation function in a thread
-        result = await loop.run_in_executor(
-            None,
-            run_simulation,
-            entities,
-            context,
-            n_turns,
-            simulation_rounds,
-            None  # output_file
-        )
+        # Create a temporary file for input
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as input_file:
+            input_path = input_file.name
+            # Prepare the input data
+            input_data = {
+                "entities": entities,
+                "context": context,
+                "n_turns": n_turns,
+                "simulation_rounds": simulation_rounds
+            }
+            # Write input data to the file
+            json.dump(input_data, input_file)
+        
+        # Create a temporary file for output
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as output_file:
+            output_path = output_file.name
+        
+        # Run the simulation in a separate process
+        logger.info(f"Running simulation {sequence_number} in separate process")
+        
+        # Path to the run_single_simulation.py script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        script_path = os.path.join(script_dir, "run_single_simulation.py")
+        
+        # Make sure the script exists, or create it
+        if not os.path.exists(script_path):
+            logger.info(f"Creating run_single_simulation.py script at {script_path}")
+            with open(script_path, 'w') as f:
+                f.write('''#!/usr/bin/env python3
+"""
+Run a single simulation in a separate process.
+This script is called by the batch simulator to avoid threading issues with DSPy.
+"""
+
+import sys
+import json
+import os
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from simulations.run_simulation import run_simulation, setup_dspy
+
+def main():
+    """Run a simulation from input file and write results to output file."""
+    if len(sys.argv) != 3:
+        print("Usage: run_single_simulation.py <input_file> <output_file>")
+        sys.exit(1)
+        
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    
+    try:
+        # Read input data
+        with open(input_file, 'r') as f:
+            input_data = json.load(f)
+            
+        # Extract simulation parameters
+        entities = input_data["entities"]
+        context = input_data["context"]
+        n_turns = input_data["n_turns"]
+        simulation_rounds = input_data["simulation_rounds"]
+        
+        # Setup DSPy in this process
+        setup_dspy()
+        
+        # Run the simulation
+        result = run_simulation(entities, context, n_turns, simulation_rounds, None)
+        
+        # Write result to output file
+        with open(output_file, 'w') as f:
+            json.dump(result, f)
+            
+        # Success
+        sys.exit(0)
+    except Exception as e:
+        # Write error to output file
+        with open(output_file, 'w') as f:
+            json.dump({"error": str(e)}, f)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+''')
+        
+        # Make the script executable
+        os.chmod(script_path, 0o755)
+        
+        # Path to the Python interpreter in the virtual environment
+        venv_dir = os.path.dirname(os.path.dirname(script_dir))
+        python_path = os.path.join(venv_dir, "venv", "bin", "python3")
+        
+        # Run the simulation process
+        cmd = [python_path, script_path, input_path, output_path]
+        process = await loop.run_in_executor(None, lambda: subprocess.run(cmd, capture_output=True))
+        
+        if process.returncode != 0:
+            logger.error(f"Simulation process failed with exit code {process.returncode}")
+            logger.error(f"Error output: {process.stderr.decode('utf-8')}")
+            return {"error": f"Simulation process failed: {process.stderr.decode('utf-8')}"}, sequence_number
+        
+        # Read the simulation result
+        with open(output_path, 'r') as f:
+            result = json.load(f)
+            
+        # Check for error in result
+        if "error" in result:
+            logger.error(f"Error in simulation {sequence_number}: {result['error']}")
+            return {"error": result["error"]}, sequence_number
         
         # Save the simulation to the database
         simulation_id = storage.save_simulation(
@@ -186,26 +288,43 @@ async def run_simulation_async(
         
     except Exception as e:
         logger.error(f"Error in simulation {sequence_number} in batch {batch_id}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {"error": str(e)}, sequence_number
+    finally:
+        # Clean up temporary files
+        try:
+            if os.path.exists(input_path):
+                os.unlink(input_path)
+            if os.path.exists(output_path):
+                os.unlink(output_path)
+        except Exception as e:
+            logger.error(f"Error cleaning up temporary files: {str(e)}")
 
 
-async def run_batch_simulations(config: BatchSimulationConfig) -> str:
+async def run_batch_simulations(config: BatchSimulationConfig, existing_batch_id: str = None) -> str:
     """
     Run a batch of simulations in parallel.
     
     Args:
         config: Batch simulation configuration
+        existing_batch_id: Optional existing batch ID to use instead of creating a new one
         
     Returns:
-        ID of the created batch
+        ID of the created or used batch
     """
-    # Create a batch record
-    batch_id = storage.create_simulation_batch(
-        name=config.name,
-        description=config.description,
-        context=config.context,
-        metadata=config.metadata
-    )
+    # Create a batch record or use existing one
+    if existing_batch_id:
+        batch_id = existing_batch_id
+        logger.info(f"Using existing batch ID: {batch_id}")
+    else:
+        batch_id = storage.create_simulation_batch(
+            name=config.name,
+            description=config.description,
+            context=config.context,
+            metadata=config.metadata
+        )
+        logger.info(f"Created new batch with ID: {batch_id}")
     
     # Update batch status to in_progress
     storage.update_batch_status(batch_id, "in_progress")
@@ -231,9 +350,6 @@ async def run_batch_simulations(config: BatchSimulationConfig) -> str:
             f"combinations are possible with {len(config.entity_ids)} entities and "
             f"interaction size {config.interaction_size}"
         )
-    
-    # Setup DSPy
-    setup_dspy()
     
     # Create a semaphore to limit concurrent API calls
     semaphore = asyncio.Semaphore(MAX_PARALLEL_SIMULATIONS)
@@ -287,21 +403,22 @@ async def run_batch_simulations(config: BatchSimulationConfig) -> str:
     return batch_id
 
 
-def run_batch(config: BatchSimulationConfig) -> str:
+def run_batch(config: BatchSimulationConfig, existing_batch_id: str = None) -> str:
     """
     Run a batch of simulations. This is the main entry point for batch simulation.
     
     Args:
         config: Batch simulation configuration
+        existing_batch_id: Optional existing batch ID to use instead of creating a new one
         
     Returns:
-        ID of the created batch
+        ID of the created or used batch
     """
     # Run the async function
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        batch_id = loop.run_until_complete(run_batch_simulations(config))
+        batch_id = loop.run_until_complete(run_batch_simulations(config, existing_batch_id))
         return batch_id
     finally:
         loop.close()

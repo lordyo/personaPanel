@@ -9,6 +9,8 @@ import LoadingIndicator from '../components/LoadingIndicator';
 const SimulationCreate = () => {
   const location = useLocation();
   const continuationData = location.state?.continuationData;
+  // Get the active tab from location state if available, default to 'individual'
+  const activeTab = location.state?.activeTab || 'individual';
 
   // States for form data and UI control
   const [entityTypes, setEntityTypes] = useState([]);
@@ -222,7 +224,10 @@ const SimulationCreate = () => {
       console.log('Simulation response:', response);
       
       if (response && response.status === 'success') {
-        navigate(`/simulations/${response.data.id}`);
+        // Navigate to simulation detail page with active tab in state
+        navigate(`/simulations/${response.data.id}`, {
+          state: { activeTab }
+        });
       } else {
         throw new Error(response?.message || 'Unknown error occurred');
       }
@@ -301,7 +306,7 @@ const SimulationCreate = () => {
         </h1>
         <button 
           className="border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 py-2 px-4 rounded-md transition-colors"
-          onClick={() => navigate('/simulations')}
+          onClick={() => navigate('/simulations', { state: { activeTab } })}
         >
           Back to Simulations
         </button>
@@ -490,7 +495,7 @@ const SimulationCreate = () => {
           <button 
             type="button" 
             className="border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 py-2 px-4 rounded-md transition-colors mr-4"
-            onClick={() => navigate('/simulations')}
+            onClick={() => navigate('/simulations', { state: { activeTab } })}
             disabled={submitting}
           >
             Cancel

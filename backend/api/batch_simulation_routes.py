@@ -7,12 +7,13 @@ This module provides API endpoints for managing batch simulations.
 import os
 import json
 import logging
-from flask import Blueprint, request, current_app, jsonify, send_file
+from flask import Blueprint, request, current_app, jsonify, send_file, make_response
 from functools import wraps
 import threading
 import io
 import csv
 from typing import Dict, List, Any, Optional
+import time
 
 import storage
 from simulations.batch_simulator import BatchSimulationConfig, run_batch
@@ -107,12 +108,19 @@ def create_batch_simulation():
     )
     
     # Start batch simulation in a separate thread to avoid blocking the response
-    def run_batch_thread(config):
+    def run_batch_thread(config, existing_batch_id):
         try:
-            batch_id = run_batch(config)
+            # Pass the existing batch ID to avoid creating another batch
+            batch_id = run_batch(config, existing_batch_id)
             logger.info(f"Batch simulation completed with ID: {batch_id}")
         except Exception as e:
             logger.error(f"Error running batch simulation: {str(e)}")
+            # Make sure to mark the batch as failed if there's an error
+            try:
+                storage.update_batch_status(existing_batch_id, "failed")
+                logger.info(f"Marked batch {existing_batch_id} as failed due to error")
+            except Exception as inner_e:
+                logger.error(f"Failed to update batch status: {str(inner_e)}")
     
     # Create the batch record first to get an ID
     batch_id = storage.create_simulation_batch(
@@ -123,7 +131,7 @@ def create_batch_simulation():
     )
     
     # Start the batch process in a background thread
-    thread = threading.Thread(target=run_batch_thread, args=(config,))
+    thread = threading.Thread(target=run_batch_thread, args=(config, batch_id))
     thread.daemon = True  # Allow the main process to exit even if the thread is still running
     thread.start()
     
@@ -175,22 +183,42 @@ def delete_batch_simulation(batch_id):
         "message": f"Batch simulation {batch_id} deleted successfully"
     })
 
-@batch_simulation_bp.route('/<batch_id>/export', methods=['GET'])
+@batch_simulation_bp.route('/<batch_id>/export', methods=['GET', 'POST'])
 @handle_exceptions
 def export_batch_simulation(batch_id):
     """
     Export batch simulation data.
     
-    Query parameters:
+    Query parameters (GET) or form data (POST):
         format: Export format (json or csv, default: json)
     """
-    format_type = request.args.get('format', 'json').lower()
+    # Log detailed request information
+    logger.info(f"Export request received: Method={request.method}, URL={request.url}")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    
+    # Get format from either query parameters (GET) or form data (POST)
+    if request.method == 'POST':
+        format_type = request.form.get('format', 'json').lower()
+        logger.info(f"POST Export request received for batch {batch_id} in format {format_type}")
+        logger.info(f"Form data: {request.form}")
+    else:
+        format_type = request.args.get('format', 'json').lower()
+        logger.info(f"GET Export request received for batch {batch_id} in format {format_type}")
+        logger.info(f"Query parameters: {request.args}")
     
     # Get the batch data
     batch = storage.get_simulation_batch(batch_id)
     
     if not batch:
+        logger.error(f"Batch simulation with ID {batch_id} not found")
         return error_response(f"Batch simulation with ID {batch_id} not found", 404)
+    
+    logger.info(f"Batch data retrieved, size: {len(str(batch))} characters")
+    
+    # Ensure browsers handle the response as a download, not as a webpage
+    # Add a timestamp to make filename unique
+    timestamp = str(int(time.time()))
+    filename_suffix = f"_{timestamp}" 
     
     if format_type == 'json':
         # Export as JSON
@@ -201,18 +229,32 @@ def export_batch_simulation(batch_id):
         mem.write(output.encode('utf-8'))
         mem.seek(0)
         
-        return send_file(
+        logger.info(f"JSON export prepared, sending file attachment: batch_simulation_{batch_id}{filename_suffix}.json")
+        
+        response = send_file(
             mem,
             mimetype='application/json',
             as_attachment=True,
-            download_name=f"batch_simulation_{batch_id}.json"
+            download_name=f"batch_simulation_{batch_id}{filename_suffix}.json"
         )
+        
+        # Add headers to ensure the browser treats this as a download
+        response.headers.add('Content-Disposition', f'attachment; filename="batch_simulation_{batch_id}{filename_suffix}.json"')
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Cache-Control', 'no-cache, no-store, must-revalidate')
+        response.headers.add('Pragma', 'no-cache')
+        response.headers.add('Expires', '0')
+        
+        return response
     
     elif format_type == 'csv':
         # Export as CSV
         simulations = batch.get('simulations', [])
         
         if not simulations:
+            logger.error(f"No simulations found in batch {batch_id}")
             return error_response("No simulations found in this batch", 404)
         
         # Create a memory file-like object for CSV
@@ -243,12 +285,74 @@ def export_batch_simulation(batch_id):
         mem_bytes.write(mem.getvalue().encode('utf-8'))
         mem_bytes.seek(0)
         
-        return send_file(
+        logger.info(f"CSV export prepared, sending file attachment: batch_simulation_{batch_id}{filename_suffix}.csv")
+        
+        response = send_file(
             mem_bytes,
             mimetype='text/csv',
             as_attachment=True,
-            download_name=f"batch_simulation_{batch_id}.csv"
+            download_name=f"batch_simulation_{batch_id}{filename_suffix}.csv"
         )
+        
+        # Add headers to ensure the browser treats this as a download
+        response.headers.add('Content-Disposition', f'attachment; filename="batch_simulation_{batch_id}{filename_suffix}.csv"')
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Cache-Control', 'no-cache, no-store, must-revalidate')
+        response.headers.add('Pragma', 'no-cache')
+        response.headers.add('Expires', '0')
+        
+        return response
     
     else:
-        return error_response(f"Unsupported export format: {format_type}", 400) 
+        logger.error(f"Unsupported export format requested: {format_type}")
+        return error_response(f"Unsupported export format: {format_type}", 400)
+
+@batch_simulation_bp.route('/<batch_id>/download', methods=['GET'])
+@handle_exceptions
+def download_batch_simulation(batch_id):
+    """
+    Serve a simple HTML page that will automatically download the batch simulation data.
+    
+    Query parameters:
+        format: Export format (json or csv, default: json)
+    """
+    format_type = request.args.get('format', 'json').lower()
+    timestamp = str(int(time.time()))
+    
+    # Create the download URL with the timestamp
+    download_url = f"/api/batch-simulations/{batch_id}/export?format={format_type}&t={timestamp}"
+    
+    # Create a simple HTML page that will automatically trigger the download
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Downloading Batch Simulation...</title>
+        <script>
+            // Start download immediately
+            window.onload = function() {{
+                // Use a short delay to allow the page to load first
+                setTimeout(function() {{
+                    window.location.href = "{download_url}";
+                    
+                    // Redirect back to the previous page after a short delay
+                    setTimeout(function() {{
+                        window.history.back();
+                    }}, 1000);
+                }}, 100);
+            }};
+        </script>
+    </head>
+    <body>
+        <h1>Download Starting...</h1>
+        <p>Your download should begin automatically. If it doesn't, <a href="{download_url}">click here</a>.</p>
+        <p>This page will close automatically...</p>
+    </body>
+    </html>
+    """
+    
+    response = make_response(html)
+    response.headers['Content-Type'] = 'text/html'
+    return response 

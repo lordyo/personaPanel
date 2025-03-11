@@ -527,6 +527,70 @@ const unifiedSimulationApi = {
   delete: (id) => del(`/unified-simulations/${id}`),
 }
 
+/**
+ * API methods for the batch simulation system.
+ * This handles running multiple simulations in parallel with configurable parameters.
+ */
+const batchSimulationApi = {
+  /**
+   * Get all batch simulations.
+   * 
+   * @param {Object} params - Query parameters
+   *   @param {boolean} [params.include_simulations=false] - Whether to include simulations in each batch
+   *   @param {number} [params.limit=20] - Maximum number of results to return
+   *   @param {number} [params.offset=0] - Number of results to skip (for pagination)
+   * @returns {Promise} - List of batch simulations
+   */
+  getAll: (params) => {
+    const queryString = params ? `?${new URLSearchParams(params)}` : '';
+    return get(`/batch-simulations${queryString}`);
+  },
+  
+  /**
+   * Get a specific batch simulation by id.
+   * 
+   * @param {string} id - The batch simulation id
+   * @returns {Promise} - The batch simulation data with all simulations
+   */
+  getById: (id) => get(`/batch-simulations/${id}`),
+  
+  /**
+   * Create a new batch simulation.
+   * 
+   * @param {Object} batchSimulation - The batch simulation data
+   *   @param {string} batchSimulation.name - Name for the batch
+   *   @param {string} [batchSimulation.description] - Optional description of the batch
+   *   @param {string} batchSimulation.context - Text description of the situation
+   *   @param {string[]} batchSimulation.entity_ids - Array of entity IDs to use in simulations
+   *   @param {number} batchSimulation.interaction_size - Number of entities per simulation
+   *   @param {number} batchSimulation.num_simulations - Number of simulations to run
+   *   @param {number} [batchSimulation.n_turns=1] - Number of turns per simulation round
+   *   @param {number} [batchSimulation.simulation_rounds=1] - Number of simulation rounds
+   *   @param {Object} [batchSimulation.metadata] - Optional metadata for the batch
+   * @returns {Promise} - The created batch simulation id and status
+   */
+  create: (batchSimulation) => post('/batch-simulations', batchSimulation),
+  
+  /**
+   * Delete a batch simulation by id.
+   * 
+   * @param {string} id - The batch simulation id to delete
+   * @returns {Promise} - Response indicating success or failure
+   */
+  delete: (id) => del(`/batch-simulations/${id}`),
+  
+  /**
+   * Export batch simulation data in different formats.
+   * 
+   * @param {string} id - The batch simulation id
+   * @param {string} format - Export format ('json' or 'csv')
+   * @returns {Promise} - The exported data
+   */
+  export: (id, format = 'json') => {
+    return get(`/batch-simulations/${id}/export?format=${format}`);
+  }
+}
+
 // Export a default API object with all the API functions
 const api = {
   // Base methods
@@ -566,15 +630,23 @@ const api = {
   continueUnifiedSimulation: unifiedSimulationApi.continue,
   deleteUnifiedSimulation: unifiedSimulationApi.delete,
   
+  // Batch simulation methods
+  getBatchSimulations: batchSimulationApi.getAll,
+  getBatchSimulation: batchSimulationApi.getById,
+  createBatchSimulation: batchSimulationApi.create,
+  deleteBatchSimulation: batchSimulationApi.delete,
+  exportBatchSimulation: batchSimulationApi.export,
+  
   // Original API objects
   entityType: entityTypeApi,
   entity: entityApi,
   template: templateApi,
   simulation: simulationApi,
-  unifiedSimulation: unifiedSimulationApi
+  unifiedSimulation: unifiedSimulationApi,
+  batchSimulation: batchSimulationApi
 };
 
 // Export the API objects as named exports as well
-export { entityTypeApi, entityApi, templateApi, simulationApi, unifiedSimulationApi };
+export { entityTypeApi, entityApi, templateApi, simulationApi, unifiedSimulationApi, batchSimulationApi };
 
 export default api; 

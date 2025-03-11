@@ -341,6 +341,50 @@ def get_entity(entity_id: str) -> Optional[Dict[str, Any]]:
         }
 
 
+def update_entity(entity_id: str, name: str, description: str, attributes: Dict[str, Any]) -> bool:
+    """
+    Update an entity by ID.
+    
+    Args:
+        entity_id: ID of the entity to update
+        name: New name for the entity
+        description: New description for the entity
+        attributes: New attributes dictionary
+        
+    Returns:
+        True if update was successful, False if entity not found or update failed
+    """
+    logger = logging.getLogger('app')
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if entity exists
+        cursor.execute('SELECT id FROM entities WHERE id = ?', (entity_id,))
+        if cursor.fetchone() is None:
+            logger.warning(f"Attempted to update non-existent entity: {entity_id}")
+            conn.close()
+            return False
+        
+        # Update the entity
+        cursor.execute('''
+        UPDATE entities
+        SET name = ?, description = ?, attributes = ?
+        WHERE id = ?
+        ''', (name, description, json.dumps(attributes), entity_id))
+        
+        conn.commit()
+        logger.info(f"Updated entity: {entity_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating entity {entity_id}: {str(e)}")
+        logger.exception("Entity update error:")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
 def get_entities_by_type(entity_type_id: str) -> List[Dict[str, Any]]:
     """
     Get all entities of a specific type.

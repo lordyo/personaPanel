@@ -13,6 +13,8 @@ import SimulationCreate from './pages/SimulationCreate';
 import SimulationList from './pages/SimulationList';
 import SimulationDetail from './pages/SimulationDetail';
 import Settings from './pages/Settings';
+import BatchSimulationCreate from './pages/BatchSimulationCreate';
+import BatchSimulationDetail from './pages/BatchSimulationDetail';
 
 // Navigation Component with Tailwind
 const Navigation = () => {
@@ -174,6 +176,9 @@ function App() {
             <Route path="/simulations" element={<SimulationList />} />
             <Route path="/simulations/create" element={<SimulationCreate />} />
             <Route path="/simulations/:id" element={<SimulationDetail />} />
+            {/* Batch Simulation Routes */}
+            <Route path="/batch-simulations/create" element={<BatchSimulationCreate />} />
+            <Route path="/batch-simulations/:id" element={<BatchSimulationDetail />} />
             {/* Settings Route */}
             <Route path="/settings" element={<Settings />} />
           </Routes>

@@ -182,7 +182,7 @@ def create_batch_signature(entity_type: str, entity_description: str, dimensions
         
         entities_desc = f"""
         A list of exactly {batch_size} unique and diverse {entity_type} entities. 
-        Each entity must be a JSON object with 'name', 'backstory', and {additional_fields_desc} fields.
+        Each entity must be a JSON object with 'name', 'backstory' (2 paragraphs), and {additional_fields_desc} fields.
         Make sure each entity has a different name and backstory from all others.
         For text dimensions like {', '.join(text_fields_list)}, generate creative and appropriate values.
         Format as a valid JSON array of objects: [{{"name": "Entity1", "backstory": "...", 
