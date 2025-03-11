@@ -215,6 +215,30 @@ def export_batch_simulation(batch_id):
     
     logger.info(f"Batch data retrieved, size: {len(str(batch))} characters")
     
+    # Fetch entity information for all entities involved in the simulations
+    simulations = batch.get('simulations', [])
+    all_entity_ids = set()
+    
+    # Collect all unique entity IDs from the simulations
+    for sim in simulations:
+        entity_ids = sim.get('entity_ids', [])
+        all_entity_ids.update(entity_ids)
+    
+    # Fetch detailed entity information
+    entity_details = {}
+    for entity_id in all_entity_ids:
+        entity = storage.get_entity(entity_id)
+        if entity:
+            entity_details[entity_id] = {
+                'id': entity.get('id'),
+                'name': entity.get('name'),
+                'description': entity.get('description'),
+                'attributes': entity.get('attributes', {}),
+                'entity_type_id': entity.get('entity_type_id')
+            }
+    
+    logger.info(f"Retrieved details for {len(entity_details)} entities")
+    
     # Ensure browsers handle the response as a download, not as a webpage
     # Add a timestamp to make filename unique
     timestamp = str(int(time.time()))
@@ -222,7 +246,11 @@ def export_batch_simulation(batch_id):
     
     if format_type == 'json':
         # Export as JSON
-        output = json.dumps(batch, indent=2)
+        # Add entity details to the batch data
+        enriched_batch = batch.copy()
+        enriched_batch['entities'] = entity_details
+        
+        output = json.dumps(enriched_batch, indent=2)
         
         # Create a memory file-like object
         mem = io.BytesIO()
@@ -261,22 +289,50 @@ def export_batch_simulation(batch_id):
         mem = io.StringIO()
         writer = csv.writer(mem)
         
-        # Write header
+        # Write simulation data with enhanced entity information
         writer.writerow([
             'Simulation ID', 'Sequence Number', 'Interaction Type', 
-            'Entity IDs', 'Context', 'Content', 'Timestamp'
+            'Entity IDs', 'Entity Names', 'Entity Descriptions',
+            'Context', 'Content', 'Timestamp'
         ])
         
-        # Write data
+        # Write data for each simulation
         for sim in simulations:
+            sim_entity_ids = sim.get('entity_ids', [])
+            
+            # Compile entity names and descriptions for this simulation
+            entity_names = []
+            entity_descriptions = []
+            
+            for entity_id in sim_entity_ids:
+                entity = entity_details.get(entity_id, {})
+                entity_names.append(entity.get('name', 'Unknown'))
+                entity_descriptions.append(entity.get('description', ''))
+            
             writer.writerow([
                 sim.get('id', ''),
                 sim.get('sequence_number', ''),
                 sim.get('interaction_type', ''),
-                ','.join(sim.get('entity_ids', [])),
+                ','.join(sim_entity_ids),
+                '|'.join(entity_names),
+                '|'.join(entity_descriptions),
                 batch.get('context', ''),
                 sim.get('content', ''),
                 sim.get('timestamp', '')
+            ])
+        
+        # Add a separate section for detailed entity information
+        writer.writerow([])  # Empty row as separator
+        writer.writerow(['Entity Details'])
+        writer.writerow(['Entity ID', 'Name', 'Description', 'Entity Type ID', 'Attributes'])
+        
+        for entity_id, entity in entity_details.items():
+            writer.writerow([
+                entity_id,
+                entity.get('name', ''),
+                entity.get('description', ''),
+                entity.get('entity_type_id', ''),
+                json.dumps(entity.get('attributes', {}))
             ])
         
         # Convert to bytes for send_file
