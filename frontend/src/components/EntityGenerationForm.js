@@ -7,9 +7,10 @@ import React, { useState, useEffect } from 'react';
  * @param {Array} props.entityTypes - Available entity types
  * @param {Function} props.onSubmit - Function to call when form is submitted
  * @param {boolean} props.disabled - Whether the form is disabled
+ * @param {string} props.defaultEntityTypeId - Optional entity type ID to select by default
  * @returns {JSX.Element} - Rendered component
  */
-const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
+const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, defaultEntityTypeId = '' }) => {
   const [entityTypeId, setEntityTypeId] = useState('');
   const [entityDescription, setEntityDescription] = useState('');
   const [count, setCount] = useState(1);
@@ -19,7 +20,22 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false }) => {
   
   // Load saved settings from localStorage when component mounts
   useEffect(() => {
-    // Load entityTypeId if saved
+    // First check if we have a default entity type ID from props
+    if (defaultEntityTypeId && entityTypes.some(type => type.id === defaultEntityTypeId)) {
+      setEntityTypeId(defaultEntityTypeId);
+      
+      // Set the description based on this type
+      const selectedType = entityTypes.find(type => type.id === defaultEntityTypeId);
+      if (selectedType && selectedType.description) {
+        setEntityDescription(selectedType.description);
+      }
+      
+      // Save to localStorage
+      localStorage.setItem('entityGenerationSettings.entityTypeId', defaultEntityTypeId);
+      return;
+    }
+    
+    // If no default entity type ID is provided, load from localStorage
     const savedEntityTypeId = localStorage.getItem('entityGenerationSettings.entityTypeId');
     // Load count if saved
     const savedCount = localStorage.getItem('entityGenerationSettings.count');

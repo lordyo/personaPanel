@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import EntityCard from '../components/EntityCard';
 import EntityForm from '../components/EntityForm';
@@ -13,6 +13,7 @@ import LoadingIndicator from '../components/LoadingIndicator';
  * @returns {JSX.Element} - Rendered component
  */
 const EntityList = () => {
+  const location = useLocation();
   const [entityTypes, setEntityTypes] = useState([]);
   const [entities, setEntities] = useState([]);
   const [filteredEntities, setFilteredEntities] = useState([]);
@@ -31,7 +32,13 @@ const EntityList = () => {
   // Fetch entity types and entities on component mount
   useEffect(() => {
     fetchData();
-  }, []);
+    
+    // Check if we should open the generate entities panel with a pre-selected entity type
+    if (location.state && location.state.entityTypeId) {
+      setGeneratingEntities(true);
+      setFilterTypeId(location.state.entityTypeId);
+    }
+  }, [location]);
   
   // Define fetchData function in the component scope so it can be reused
   const fetchData = async () => {
@@ -461,6 +468,7 @@ const EntityList = () => {
             entityTypes={entityTypes}
             onSubmit={handleGenerateEntities}
             disabled={loading}
+            defaultEntityTypeId={filterTypeId}
           />
           <button
             onClick={() => setGeneratingEntities(false)}
