@@ -38,12 +38,43 @@ const BatchSimulationDetail = () => {
           return;
         }
         
-        setBatchSimulation(batchSimulationData);
+        // Extract simulations first so we can use them to calculate missing fields
+        const simulations = batchSimulationData.simulations || [];
         
-        // Check if component simulations are already in the response
-        if (batchSimulationData.simulations && Array.isArray(batchSimulationData.simulations)) {
-          console.log('Using simulations from batch data:', batchSimulationData.simulations.length);
-          setComponentSimulations(batchSimulationData.simulations);
+        // Calculate missing fields from simulations data
+        const derivedData = {
+          // Calculate interaction_size from the first simulation (number of entities)
+          interaction_size: simulations.length > 0 ? simulations[0].entity_ids.length : null,
+          
+          // Get n_turns from the first simulation's metadata
+          n_turns: simulations.length > 0 && simulations[0].metadata ? 
+            simulations[0].metadata.n_turns || null : null,
+          
+          // Count the number of simulations
+          num_simulations: simulations.length,
+          
+          // Get simulation_rounds from the first simulation's metadata
+          simulation_rounds: simulations.length > 0 && simulations[0].metadata ? 
+            simulations[0].metadata.simulation_rounds || 1 : 1
+        };
+        
+        // Extract fields from metadata if they're not at the top level
+        const metadata = batchSimulationData.metadata || {};
+        const enhancedBatchData = {
+          ...batchSimulationData,
+          interaction_size: batchSimulationData.interaction_size || metadata.interaction_size || derivedData.interaction_size,
+          n_turns: batchSimulationData.n_turns || metadata.n_turns || derivedData.n_turns,
+          num_simulations: batchSimulationData.num_simulations || metadata.num_simulations || derivedData.num_simulations,
+          simulation_rounds: batchSimulationData.simulation_rounds || metadata.simulation_rounds || derivedData.simulation_rounds,
+          metadata: metadata
+        };
+        
+        console.log('Enhanced batch data:', enhancedBatchData);
+        setBatchSimulation(enhancedBatchData);
+        
+        if (simulations.length > 0) {
+          console.log('Using simulations from batch data:', simulations.length);
+          setComponentSimulations(simulations);
           setLoading(false);
           return;
         }
@@ -207,6 +238,12 @@ const BatchSimulationDetail = () => {
         </h1>
         <div className="space-x-2">
           <button
+            onClick={() => navigate('/simulations', { state: { activeTab: 'batch' } })}
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2"
+          >
+            Back to Simulations
+          </button>
+          <button
             onClick={() => setExportModalOpen(true)}
             className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
           >
@@ -239,19 +276,27 @@ const BatchSimulationDetail = () => {
           </div>
           <div>
             <p className="text-gray-400">Interaction Size:</p>
-            <p className="text-white">{batchSimulation.interaction_size}</p>
+            <p className="text-white">{batchSimulation.interaction_size || '-'}</p>
           </div>
           <div>
             <p className="text-gray-400">Number of Turns:</p>
-            <p className="text-white">{batchSimulation.num_turns}</p>
+            <p className="text-white">{batchSimulation.n_turns || '-'}</p>
           </div>
           <div>
             <p className="text-gray-400">Number of Simulations:</p>
-            <p className="text-white">{batchSimulation.num_simulations}</p>
+            <p className="text-white">{batchSimulation.num_simulations || '-'}</p>
           </div>
           <div>
             <p className="text-gray-400">Number of Rounds:</p>
-            <p className="text-white">{batchSimulation.num_rounds || 1}</p>
+            <p className="text-white">{batchSimulation.simulation_rounds || 1}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Interaction Type:</p>
+            <p className="text-white">{(batchSimulation.metadata && batchSimulation.metadata.interaction_type) || 'discussion'}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Language:</p>
+            <p className="text-white">{(batchSimulation.metadata && batchSimulation.metadata.language) || 'English'}</p>
           </div>
         </div>
       </div>
@@ -289,16 +334,17 @@ const BatchSimulationDetail = () => {
                     <td className="px-4 py-2 text-white">{sim.name || 'No name'}</td>
                     <td className="px-4 py-2 text-white">
                       <span className={`px-2 py-1 rounded-full text-xs ${
-                        sim.status === 'completed' ? 'bg-green-900 text-green-300' :
-                        sim.status === 'error' ? 'bg-red-900 text-red-300' :
-                        sim.status === 'in_progress' ? 'bg-blue-900 text-blue-300' :
-                        'bg-gray-600 text-gray-300'
+                        sim.status === 'completed' || (sim.metadata && sim.metadata.status === 'completed') ? 'bg-green-900 text-green-300' :
+                        sim.status === 'error' || (sim.metadata && sim.metadata.status === 'error') ? 'bg-red-900 text-red-300' :
+                        sim.status === 'in_progress' || (sim.metadata && sim.metadata.status === 'in_progress') ? 'bg-blue-900 text-blue-300' :
+                        'bg-green-900 text-green-300' // Default to completed (green) if no status
                       }`}>
-                        {sim.status || 'Unknown'}
+                        {sim.status || (sim.metadata && sim.metadata.status) || 'Completed'}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-white">
-                      {sim.created_at ? new Date(sim.created_at).toLocaleString() : 'Unknown'}
+                      {sim.created_at ? new Date(sim.created_at).toLocaleString() : 
+                       sim.timestamp ? new Date(sim.timestamp).toLocaleString() : 'Unknown'}
                     </td>
                     <td className="px-4 py-2">
                       <Link
