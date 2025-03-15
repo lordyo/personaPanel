@@ -150,8 +150,25 @@ def create_final_entity_signature(entity_type: str, entity_description: str,
     """
     attributes = {
         "__doc__": f"""
-        Generate a name and backstory for a {entity_type} based on all its attributes
-        and the provided bisociative fuel words for creativity.
+        Generate a name and backstory for the entity based on all its attributes and the provided bisociative fuel words. Prioritize the entity’s attributes when determining the name and backstory, and use the bisociative fuel words as a secondary source of inspiration. Their influence should be proportional to the creativity level: subtle at lower levels, more pronounced at higher levels, but never overpowering the entity’s logical coherence. Metaphorical or thematic connections to the fuel words are preferred over literal ones. Ensure the name and backstory feel natural and cohesive without requiring knowledge of the fuel words to make sense.
+        
+        ## Examples
+
+        1. Entity: Alien Species
+            Attributes: Bioluminescent, aquatic, peaceful diplomats
+            Bisociative Fuel: "Glass" & "Echo"
+            ✅ Name: Echorin
+            ✅ Backstory: "A species known for their harmonic communication, the Echorin possess translucent, glass-like skin that refracts light in mesmerizing ways, allowing them to express emotions through shifting colors. (... backstory continues ...)"
+            🚫 Overpowered Name: Glass-Echo People
+            🚫 Overpowered Backstory: "These aliens emit psychic reverberations that shatter mirrors and only communicate through whispers on reflective surfaces. (... backstory continues ...)"
+
+        2. Entity: Astrobiologists
+            Attributes: Female, 42, Japanese, analytical, curious
+            Bisociative Fuel: "Jellyfish" & "Obsidian"
+            ✅ Name: Dr. Kuroi Aomi
+            ✅ Backstory: "A pioneer in deep-space microbiology, Dr. Kuroi Aomi studies extremophiles that thrive in hostile environments. Her colleagues call her ‘Aurelia’—a nod to her fascination with bioluminescent organisms and their ability to adapt in the void of space. (... backstory continues ...)"
+            🚫 Overpowered Name: ObsiJelly Nomura
+            🚫 Overpowered Backstory: "After an accident with deep-sea jellyfish DNA, she developed glowing obsidian-like skin and now roams the world searching for symbiotic creatures like herself. (... backstory continues ...)"
         """,
         
         # Standard input fields
@@ -161,8 +178,8 @@ def create_final_entity_signature(entity_type: str, entity_description: str,
         "bisociative_fuel": dspy.InputField(desc="Two random words to inspire creative naming and narration elements."),
         
         # Standard output fields - always present
-        "name": dspy.OutputField(desc="A fitting name for this entity, inspired by its attributes and the bisociative fuel words."),
-        "backstory": dspy.OutputField(desc="A cohesive description of the entity that reflects all provided attributes.")
+        "name": dspy.OutputField(desc="A name that naturally fits the entity's attributes, subtly influenced by the bisociative fuel words without being overt or forced."),
+        "backstory": dspy.OutputField(desc="A cohesive and immersive description that fully reflects the entity's attributes, ensuring it feels distinct and well-rounded."),
     }
     
     # Add all dimensions as input fields
@@ -302,7 +319,7 @@ class MultiStepEntityCreator(dspy.Module):
         )
         
         # Create a predictor for the final entity
-        final_predictor = dspy.Predict(FinalEntitySignature)
+        final_predictor = dspy.ChainOfThought(FinalEntitySignature)
         
         # Build input arguments for the final prediction
         final_input_args = {

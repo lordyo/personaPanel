@@ -19,47 +19,6 @@ const EntityCard = ({
   onDelete 
 }) => {
   if (!entity) return null;
-
-  // Extract key attributes to display in card
-  const displayAttributes = () => {
-    if (!entity.attributes) return [];
-    
-    // Log entity data for debugging
-    console.log("Entity data:", entity);
-    
-    // Get at most 3 key attributes to show
-    const attributesToShow = [];
-    const attributes = entity.attributes;
-    
-    // Add any numerical attributes that might be interesting
-    Object.entries(attributes).forEach(([key, value]) => {
-      // Skip long text fields, private fields, and backstory (since it's redundant with description)
-      if (typeof value === 'string' && value.length > 50) return;
-      if (key.startsWith('_')) return;
-      if (key === 'backstory') return; // Skip backstory as it's redundant with description
-      
-      // Format the value for display
-      let displayValue = value;
-      if (typeof value === 'boolean') {
-        displayValue = value ? 'Yes' : 'No';
-      } else if (value === null || value === undefined) {
-        displayValue = 'N/A';
-      } else if (typeof value === 'object') {
-        displayValue = JSON.stringify(value);
-      } else {
-        displayValue = String(value);
-      }
-      
-      attributesToShow.push({ key, value: displayValue });
-      
-      // Limit to 3 attributes
-      if (attributesToShow.length >= 3) return;
-    });
-    
-    return attributesToShow;
-  };
-  
-  const attributes = displayAttributes();
   
   const handleCheckboxClick = (e) => {
     // Stop event propagation to prevent card click
@@ -79,10 +38,28 @@ const EntityCard = ({
     onViewDetails(entity);
   };
 
+  // Function to truncate description to first 100 words
+  const truncateToWords = (text, wordCount) => {
+    if (!text) return '';
+    
+    const words = text.split(/\s+/);
+    if (words.length <= wordCount) return text;
+    
+    return words.slice(0, wordCount).join(' ') + '...';
+  };
+
+  // Handle click on the card itself
+  const handleCardClick = () => {
+    onViewDetails(entity);
+  };
+
   return (
-    <div className={`bg-gray-800 border rounded-lg overflow-hidden transition-all duration-200 ${
-      isSelected ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-gray-700 hover:border-gray-600'
-    }`}>
+    <div 
+      className={`bg-gray-800 border rounded-lg overflow-hidden transition-all duration-200 ${
+        isSelected ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-gray-700 hover:border-gray-600'
+      } cursor-pointer`}
+      onClick={handleCardClick}
+    >
       {/* Card header with selection checkbox */}
       <div className="p-4 flex items-start justify-between">
         <div className="flex items-center">
@@ -166,25 +143,12 @@ const EntityCard = ({
         </div>
       </div>
       
-      {/* Card body with entity preview */}
+      {/* Card body with entity description - only show first 100 words */}
       <div className="px-4 pb-4">
         {entity.description && (
-          <p className="text-gray-300 text-sm mb-3">
-            {entity.description.length > 100 
-              ? `${entity.description.substring(0, 100)}...` 
-              : entity.description}
+          <p className="text-gray-300 text-sm">
+            {truncateToWords(entity.description, 100)}
           </p>
-        )}
-        
-        {attributes.length > 0 && (
-          <div className="grid grid-cols-1 gap-2">
-            {attributes.map((attr, index) => (
-              <div key={index} className="flex justify-between text-sm">
-                <span className="text-gray-400">{attr.key}:</span>
-                <span className="text-gray-300 font-medium">{attr.value}</span>
-              </div>
-            ))}
-          </div>
         )}
       </div>
     </div>
