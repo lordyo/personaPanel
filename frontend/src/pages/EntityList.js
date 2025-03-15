@@ -233,7 +233,7 @@ const EntityList = () => {
         // Create an array of promises for generating entities
         const entityPromises = Array(count)
           .fill()
-          .map(() => api.generateEntity(entityTypeId, variability, entityDescription));
+          .map(() => api.generateEntities(entityTypeId, 1, variability, entityDescription));
         
         // Wait for all entity promises to resolve
         newEntities = await Promise.all(entityPromises);
