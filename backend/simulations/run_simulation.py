@@ -106,7 +106,9 @@ def run_simulation(
     context: str,
     n_turns: int = 1,
     simulation_rounds: int = 1,
-    output_file: Optional[str] = None
+    output_file: Optional[str] = None,
+    interaction_type: str = "discussion",
+    language: str = "English"
 ) -> Dict:
     """
     Run a complete simulation with the specified parameters.
@@ -117,6 +119,8 @@ def run_simulation(
         n_turns: Number of turns per simulation round
         simulation_rounds: Number of successive LLM calls
         output_file: Optional path to save the output
+        interaction_type: Type of interaction (discussion, debate, etc.)
+        language: Language for the simulation
         
     Returns:
         Dictionary with simulation results
@@ -137,7 +141,9 @@ def run_simulation(
             context=context,
             n_turns=n_turns,
             last_turn_number=last_turn_number,
-            previous_interaction=previous_interaction
+            previous_interaction=previous_interaction,
+            interaction_type=interaction_type,
+            language=language
         )
         
         # Update for next round
@@ -153,7 +159,7 @@ def run_simulation(
         "id": str(uuid.uuid4()),
         "timestamp": datetime.now().isoformat(),
         "context_id": str(uuid.uuid4()),  # In a real system, this might track the context
-        "interaction_type": "solo" if len(entities) == 1 else "group",
+        "interaction_type": interaction_type,
         "entity_ids": [entity.get('id', 'unknown') for entity in entities],
         "content": combined_content,
         "metadata": {
@@ -196,6 +202,8 @@ def main():
     n_turns = sim_config.get('n_turns', 1)
     simulation_rounds = sim_config.get('simulation_rounds', 1)
     entity_ids = sim_config.get('entity_ids', [])
+    interaction_type = sim_config.get('interaction_type', 'discussion')
+    language = sim_config.get('language', 'English')
     
     # Load entities
     entities = load_entities(args.entities, entity_ids)
@@ -221,7 +229,9 @@ def main():
         context=context,
         n_turns=n_turns,
         simulation_rounds=simulation_rounds,
-        output_file=output_file
+        output_file=output_file,
+        interaction_type=interaction_type,
+        language=language
     )
     
     # Print a preview of the content

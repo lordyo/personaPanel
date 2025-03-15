@@ -57,88 +57,125 @@ def handle_exceptions(func):
 @handle_exceptions
 def create_batch_simulation():
     """
-    Create a new batch simulation.
+    Create a new batch simulation
     
     Request body:
     {
-        "name": "Batch Simulation Name",
-        "description": "Optional description",
-        "context": "Situation context description",
-        "entity_ids": ["id1", "id2", "id3", ...],
-        "interaction_size": 2,
-        "num_simulations": 5,
-        "n_turns": 1,
-        "simulation_rounds": 1,
-        "metadata": { "optional": "metadata" }
+        "name": str,              # Required: Name of the batch simulation
+        "description": str,       # Optional: Description of the batch simulation
+        "context": str,           # Required: Context for the simulation
+        "entity_ids": list[str],  # Required: List of entity IDs to include in the batch
+        "interaction_size": int,  # Required: Number of entities per interaction (1 for solo, 2 for dyadic, etc.)
+        "num_simulations": int,   # Required: Number of simulations to run
+        "n_turns": int,           # Optional: Number of turns per simulation (default: 1)
+        "simulation_rounds": int, # Optional: Number of rounds per simulation (default: 1)
+        "interaction_type": str,  # Optional: Type of interaction (default: 'discussion')
+        "language": str,          # Optional: Language for the interaction (default: 'English')
+        "metadata": dict          # Optional: Additional metadata
+    }
+    
+    Returns:
+    {
+        "id": str,                # UUID of the created batch simulation
+        "message": str            # Success message
     }
     """
-    data = request.json or {}
-    
-    # Validate required fields
-    required_fields = ['name', 'context', 'entity_ids', 'interaction_size', 'num_simulations']
-    for field in required_fields:
-        if field not in data:
-            return error_response(f"Missing required field: {field}", 400)
-    
-    # Validate entity IDs
-    if not isinstance(data['entity_ids'], list) or len(data['entity_ids']) == 0:
-        return error_response("entity_ids must be a non-empty list", 400)
-    
-    # Validate interaction_size
-    interaction_size = data.get('interaction_size')
-    if not isinstance(interaction_size, int) or interaction_size < 1:
-        return error_response("interaction_size must be a positive integer", 400)
-    
-    # Validate num_simulations
-    num_simulations = data.get('num_simulations')
-    if not isinstance(num_simulations, int) or num_simulations < 1:
-        return error_response("num_simulations must be a positive integer", 400)
-    
-    # Create batch config
-    config = BatchSimulationConfig(
-        name=data['name'],
-        description=data.get('description'),
-        entity_ids=data['entity_ids'],
-        context=data['context'],
-        interaction_size=interaction_size,
-        num_simulations=num_simulations,
-        n_turns=data.get('n_turns', 1),
-        simulation_rounds=data.get('simulation_rounds', 1),
-        metadata=data.get('metadata')
-    )
-    
-    # Start batch simulation in a separate thread to avoid blocking the response
-    def run_batch_thread(config, existing_batch_id):
-        try:
-            # Pass the existing batch ID to avoid creating another batch
-            batch_id = run_batch(config, existing_batch_id)
-            logger.info(f"Batch simulation completed with ID: {batch_id}")
-        except Exception as e:
-            logger.error(f"Error running batch simulation: {str(e)}")
-            # Make sure to mark the batch as failed if there's an error
+    try:
+        logger.info("Received batch simulation creation request")
+        
+        # Get request data
+        data = request.json
+        
+        # Log for debugging
+        logger.debug(f"Batch simulation request data: {data}")
+        
+        # Validate required fields
+        required_fields = ['name', 'context', 'entity_ids', 'interaction_size', 'num_simulations']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                logger.error(f"Missing required field: {field}")
+                return error_response(f"Missing required field: {field}", 400)
+        
+        # Validate entity_ids is a list
+        if not isinstance(data['entity_ids'], list):
+            logger.error("entity_ids must be a list")
+            return error_response("entity_ids must be a list", 400)
+        
+        # Validate interaction_size and num_simulations are positive integers
+        for field in ['interaction_size', 'num_simulations']:
+            if not isinstance(data[field], int) or data[field] <= 0:
+                logger.error(f"{field} must be a positive integer")
+                return error_response(f"{field} must be a positive integer", 400)
+        
+        # Set defaults for optional fields
+        n_turns = data.get('n_turns', 1)
+        simulation_rounds = data.get('simulation_rounds', 1)
+        interaction_type = data.get('interaction_type', 'discussion')
+        language = data.get('language', 'English')
+        metadata = data.get('metadata', {})
+        
+        # Ensure metadata is a dictionary
+        if not isinstance(metadata, dict):
+            metadata = {}
+            
+        # Add the interaction type and language to metadata if not already present
+        if 'interaction_type' not in metadata:
+            metadata['interaction_type'] = interaction_type
+        if 'language' not in metadata:
+            metadata['language'] = language
+        
+        # Create batch simulation config
+        config = BatchSimulationConfig(
+            name=data['name'],
+            description=data.get('description', ''),
+            entity_ids=data['entity_ids'],
+            context=data['context'],
+            interaction_size=data['interaction_size'],
+            num_simulations=data['num_simulations'],
+            n_turns=n_turns,
+            simulation_rounds=simulation_rounds,
+            metadata={
+                **metadata,
+            }
+        )
+        
+        # Start batch simulation in a separate thread to avoid blocking
+        logger.info(f"Creating batch simulation with config: {config}")
+        
+        # Create batch record to get an ID
+        batch_id = storage.create_simulation_batch(
+            name=config.name,
+            description=config.description,
+            context=config.context,
+            status="pending",
+            metadata=config.metadata
+        )
+        
+        # Run batch in thread
+        def run_batch_thread():
             try:
-                storage.update_batch_status(existing_batch_id, "failed")
-                logger.info(f"Marked batch {existing_batch_id} as failed due to error")
-            except Exception as inner_e:
-                logger.error(f"Failed to update batch status: {str(inner_e)}")
-    
-    # Create the batch record first to get an ID
-    batch_id = storage.create_simulation_batch(
-        name=config.name,
-        description=config.description,
-        context=config.context,
-        metadata=config.metadata
-    )
-    
-    # Start the batch process in a background thread
-    thread = threading.Thread(target=run_batch_thread, args=(config, batch_id))
-    thread.daemon = True  # Allow the main process to exit even if the thread is still running
-    thread.start()
-    
-    return success_response({
-        "id": batch_id,
-        "message": "Batch simulation started"
-    }, 201)
+                logger.info(f"Starting batch simulation thread for {batch_id}")
+                run_batch(config, batch_id)
+                logger.info(f"Completed batch simulation {batch_id}")
+            except Exception as e:
+                logger.error(f"Error in batch simulation thread: {e}")
+                # Update batch status to failed
+                storage.update_batch_status(batch_id, "failed")
+        
+        # Start thread
+        thread = threading.Thread(target=run_batch_thread)
+        thread.daemon = True
+        thread.start()
+        
+        # Return batch ID
+        return success_response({
+            "id": batch_id,
+            "message": "Batch simulation started successfully"
+        }, 201)
+        
+    except Exception as e:
+        logger.error(f"Error creating batch simulation: {e}")
+        return error_response(str(e), 500)
 
 @batch_simulation_bp.route('', methods=['GET'])
 @handle_exceptions

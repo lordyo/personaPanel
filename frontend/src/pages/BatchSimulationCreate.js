@@ -17,6 +17,8 @@ const BatchSimulationCreate = () => {
     num_simulations: 3,
     n_turns: 1,
     simulation_rounds: 1,
+    interaction_type: 'discussion',
+    language: 'English',
     metadata: {
       tags: []
     }
@@ -249,7 +251,13 @@ const BatchSimulationCreate = () => {
         num_simulations: formData.num_simulations,
         n_turns: formData.n_turns,
         simulation_rounds: formData.simulation_rounds,
-        metadata: formData.metadata
+        interaction_type: formData.interaction_type,
+        language: formData.language,
+        metadata: {
+          ...formData.metadata,
+          interaction_type: formData.interaction_type,
+          language: formData.language
+        }
       };
       
       console.log('Submitting batch simulation data:', batchData);
@@ -590,6 +598,44 @@ const BatchSimulationCreate = () => {
               />
               <p className="text-sm text-gray-400 mt-1">
                 Number of sequential LLM calls (default: 1)
+              </p>
+            </div>
+
+            {/* Interaction Type */}
+            <div>
+              <label htmlFor="interaction_type" className="block text-gray-300 font-medium mb-2">
+                Interaction Type
+              </label>
+              <input
+                id="interaction_type"
+                name="interaction_type"
+                type="text"
+                value={formData.interaction_type}
+                onChange={handleInputChange}
+                placeholder="discussion"
+                className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-sm text-gray-400 mt-1">
+                How entities interact (e.g., discussion, debate, trade, fight)
+              </p>
+            </div>
+            
+            {/* Language */}
+            <div>
+              <label htmlFor="language" className="block text-gray-300 font-medium mb-2">
+                Language
+              </label>
+              <input
+                id="language"
+                name="language"
+                type="text"
+                value={formData.language}
+                onChange={handleInputChange}
+                placeholder="English"
+                className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-sm text-gray-400 mt-1">
+                Output language for the interaction
               </p>
             </div>
           </div>

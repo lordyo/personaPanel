@@ -17,7 +17,7 @@ import logging
 import itertools
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 
 # Add parent directory to path to allow imports
@@ -43,16 +43,19 @@ MAX_PARALLEL_SIMULATIONS = int(os.getenv("MAX_PARALLEL_SIMULATIONS", "10"))
 
 @dataclass
 class BatchSimulationConfig:
-    """Configuration for a batch simulation run."""
+    """Configuration for batch simulation."""
     name: str
-    description: Optional[str]
-    entity_ids: List[str]
-    context: str
-    interaction_size: int  # Number of entities per simulation
-    num_simulations: int  # Number of simulations to run
-    n_turns: int
-    simulation_rounds: int
-    metadata: Optional[Dict[str, Any]] = None
+    description: str = ""
+    entity_ids: List[str] = field(default_factory=list)
+    context: str = ""
+    interaction_size: int = 2  # Number of entities per interaction
+    num_simulations: int = 3   # Number of simulations to generate
+    n_turns: int = 1           # Number of turns per simulation
+    simulation_rounds: int = 1 # Number of rounds per simulation
+    metadata: Dict[str, Any] = field(default_factory=lambda: {
+        "interaction_type": "discussion",
+        "language": "English"
+    })
 
 
 def generate_entity_combinations(entity_ids: List[str], k: int, max_combinations: int) -> List[List[str]]:
@@ -106,7 +109,9 @@ async def run_simulation_async(
     n_turns: int,
     simulation_rounds: int,
     sequence_number: int,
-    batch_id: str
+    batch_id: str,
+    interaction_type: str = "discussion",
+    language: str = "English"
 ) -> Tuple[Dict[str, Any], int]:
     """
     Run a single simulation asynchronously.
@@ -118,6 +123,8 @@ async def run_simulation_async(
         simulation_rounds: Number of simulation rounds
         sequence_number: Sequence number in the batch
         batch_id: ID of the containing batch
+        interaction_type: Type of interaction (discussion, debate, etc.)
+        language: Language for the simulation
         
     Returns:
         Tuple of (simulation result dictionary, sequence number)
@@ -135,8 +142,9 @@ async def run_simulation_async(
         logger.error(f"No valid entities found for simulation {sequence_number} in batch {batch_id}")
         return {"error": "No valid entities found"}, sequence_number
     
-    # Determine interaction type
-    interaction_type = determine_interaction_type(len(entities))
+    # If interaction_type is None or empty, determine it based on entity count
+    if not interaction_type:
+        interaction_type = determine_interaction_type(len(entities))
     
     # Create a context object
     context_id = str(uuid.uuid4())
@@ -155,7 +163,9 @@ async def run_simulation_async(
                 "entities": entities,
                 "context": context,
                 "n_turns": n_turns,
-                "simulation_rounds": simulation_rounds
+                "simulation_rounds": simulation_rounds,
+                "interaction_type": interaction_type,
+                "language": language
             }
             # Write input data to the file
             json.dump(input_data, input_file)
@@ -209,12 +219,22 @@ def main():
         context = input_data["context"]
         n_turns = input_data["n_turns"]
         simulation_rounds = input_data["simulation_rounds"]
+        interaction_type = input_data.get("interaction_type", "discussion")
+        language = input_data.get("language", "English")
         
         # Setup DSPy in this process
         setup_dspy()
         
         # Run the simulation
-        result = run_simulation(entities, context, n_turns, simulation_rounds, None)
+        result = run_simulation(
+            entities, 
+            context, 
+            n_turns, 
+            simulation_rounds, 
+            None, 
+            interaction_type=interaction_type,
+            language=language
+        )
         
         # Write result to output file
         with open(output_file, 'w') as f:
@@ -267,7 +287,8 @@ if __name__ == "__main__":
                 "n_turns": n_turns,
                 "simulation_rounds": simulation_rounds,
                 "batch_id": batch_id,
-                "sequence_number": sequence_number
+                "sequence_number": sequence_number,
+                "language": language
             },
             final_turn_number=result["metadata"]["final_turn_number"]
         )
@@ -354,11 +375,15 @@ async def run_batch_simulations(config: BatchSimulationConfig, existing_batch_id
     # Create a semaphore to limit concurrent API calls
     semaphore = asyncio.Semaphore(MAX_PARALLEL_SIMULATIONS)
     
+    # Extract interaction_type and language from config metadata
+    interaction_type = config.metadata.get("interaction_type", "discussion")
+    language = config.metadata.get("language", "English")
+    
     # Define a wrapper function that respects the semaphore
-    async def run_with_semaphore(entity_ids, context, n_turns, simulation_rounds, sequence_number, batch_id):
+    async def run_with_semaphore(entity_ids, context, n_turns, simulation_rounds, sequence_number, batch_id, interaction_type, language):
         async with semaphore:
             return await run_simulation_async(
-                entity_ids, context, n_turns, simulation_rounds, sequence_number, batch_id
+                entity_ids, context, n_turns, simulation_rounds, sequence_number, batch_id, interaction_type, language
             )
     
     # Create tasks for all simulations
@@ -371,7 +396,9 @@ async def run_batch_simulations(config: BatchSimulationConfig, existing_batch_id
                 config.n_turns,
                 config.simulation_rounds,
                 i + 1,  # Sequence number (1-indexed)
-                batch_id
+                batch_id,
+                interaction_type,
+                language
             )
         )
     

@@ -46,6 +46,10 @@ def main():
                       help='Number of turns per simulation round')
     parser.add_argument('--simulation-rounds', type=int, default=1,
                       help='Number of simulation rounds')
+    parser.add_argument('--interaction-type', type=str, default='discussion',
+                      help='Type of interaction (default: discussion)')
+    parser.add_argument('--language', type=str, default='English',
+                      help='Language for the interaction (default: English)')
     
     args = parser.parse_args()
     
@@ -98,13 +102,19 @@ def main():
         interaction_size=args.interaction_size,
         num_simulations=args.num_simulations,
         n_turns=args.n_turns,
-        simulation_rounds=args.simulation_rounds
+        simulation_rounds=args.simulation_rounds,
+        metadata={
+            "interaction_type": args.interaction_type,
+            "language": args.language
+        }
     )
     
     # Run the batch
     logger.info(f"Starting batch simulation with {args.num_simulations} simulations")
     logger.info(f"Entity IDs: {', '.join(entity_ids)}")
     logger.info(f"Interaction size: {args.interaction_size}")
+    logger.info(f"Interaction type: {args.interaction_type}")
+    logger.info(f"Language: {args.language}")
     
     batch_id = run_batch(config)
     

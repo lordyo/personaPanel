@@ -32,12 +32,22 @@ def main():
         context = input_data["context"]
         n_turns = input_data["n_turns"]
         simulation_rounds = input_data["simulation_rounds"]
+        interaction_type = input_data.get("interaction_type", "discussion")
+        language = input_data.get("language", "English")
         
         # Setup DSPy in this process
         setup_dspy()
         
-        # Run the simulation
-        result = run_simulation(entities, context, n_turns, simulation_rounds, None)
+        # Run the simulation with all parameters
+        result = run_simulation(
+            entities=entities,
+            context=context,
+            n_turns=n_turns,
+            simulation_rounds=simulation_rounds,
+            output_file=None,
+            interaction_type=interaction_type,
+            language=language
+        )
         
         # Write result to output file
         with open(output_file, 'w') as f:

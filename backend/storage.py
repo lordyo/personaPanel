@@ -1070,8 +1070,9 @@ def delete_entity_type(entity_type_id: str) -> bool:
 
 def create_simulation_batch(
     name: str,
-    description: Optional[str],
-    context: str,
+    description: Optional[str] = None,
+    context: str = "",
+    status: str = "pending",
     metadata: Optional[Dict[str, Any]] = None
 ) -> str:
     """
@@ -1081,7 +1082,8 @@ def create_simulation_batch(
         name: Name of the batch
         description: Optional description of the batch
         context: The context used for all simulations in this batch
-        metadata: Optional metadata dictionary
+        status: Initial status of the batch (default: "pending")
+        metadata: Optional metadata dictionary (can include entity_ids)
         
     Returns:
         ID of the created batch
@@ -1101,13 +1103,14 @@ def create_simulation_batch(
             description,
             context,
             json.dumps(metadata) if metadata else None,
-            'pending',  # Initial status
+            status,
             datetime.datetime.now().isoformat()
         )
     )
     
     conn.commit()
     conn.close()
+    
     return batch_id
 
 def add_simulation_to_batch(batch_id: str, simulation_id: str, sequence_number: int) -> bool:
