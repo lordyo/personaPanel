@@ -289,10 +289,19 @@ const SimulationDetail = () => {
             <p className="text-white">{simulation.entities?.length || simulation.entity_ids?.length || 0} entities</p>
           </div>
           
-          {(simulation.interaction_type || simulation.metadata?.interaction_type) && (
+          {/* Show the new interaction_type from metadata (what kind of interaction happens between entities) */}
+          {simulation.metadata?.interaction_type && (
             <div>
               <p className="text-gray-400">Interaction Type:</p>
-              <p className="text-white">{simulation.interaction_type || simulation.metadata?.interaction_type}</p>
+              <p className="text-white">{simulation.metadata.interaction_type}</p>
+            </div>
+          )}
+          
+          {/* If there's no interaction_type in metadata, but the user is looking at an individual simulation with the old format */}
+          {!simulation.metadata?.interaction_type && simulation.interaction_type && (
+            <div>
+              <p className="text-gray-400">Interaction Type:</p>
+              <p className="text-white">discussion</p>
             </div>
           )}
           
