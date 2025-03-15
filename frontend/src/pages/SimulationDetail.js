@@ -49,10 +49,20 @@ const SimulationDetail = () => {
   }, [id]);
 
   const handleBack = () => {
-    // Navigate back to simulations list with active tab preserved
-    navigate('/simulations', {
-      state: { activeTab }
-    });
+    // Check if we navigated from a batch simulation page
+    if (location.state?.fromBatch && location.state?.batchId) {
+      // Navigate back to the batch simulation detail page
+      navigate(`/batch-simulations/${location.state.batchId}`, {
+        state: { 
+          activeTab: 'batch'
+        }
+      });
+    } else {
+      // Navigate back to simulations list with active tab preserved
+      navigate('/simulations', {
+        state: { activeTab }
+      });
+    }
   };
   
   const handleOpenContinueDialog = () => {

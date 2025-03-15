@@ -239,9 +239,9 @@ const BatchSimulationDetail = () => {
         <div className="space-x-2">
           <button
             onClick={() => navigate('/simulations', { state: { activeTab: 'batch' } })}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2"
+            className="border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 py-2 px-4 rounded-md transition-colors"
           >
-            Back to Simulations
+            Back
           </button>
           <button
             onClick={() => setExportModalOpen(true)}
@@ -349,6 +349,12 @@ const BatchSimulationDetail = () => {
                     <td className="px-4 py-2">
                       <Link
                         to={`/simulations/${sim.id}`}
+                        state={{ 
+                          fromBatch: true, 
+                          batchId: batchSimulation.id,
+                          batchName: batchSimulation.name,
+                          activeTab: 'individual' 
+                        }}
                         className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm"
                       >
                         View
