@@ -1337,6 +1337,7 @@ def get_unified_simulations():
         interaction_type: Filter by interaction type (solo, dyadic, group)
         limit: Maximum number of simulations to return (default: 20)
         offset: Number of simulations to skip (for pagination)
+        includeBatchSims: Whether to include simulations that are part of batches (default: false)
     
     Returns:
         JSON response with the list of simulations
@@ -1347,8 +1348,9 @@ def get_unified_simulations():
     interaction_type = request.args.get('interaction_type')
     limit = int(request.args.get('limit', 20))
     offset = int(request.args.get('offset', 0))
+    include_batch_sims = request.args.get('includeBatchSims', 'false').lower() == 'true'
     
-    logger.info(f"Getting unified simulations with params: entity_id={entity_id}, entity_type_id={entity_type_id}, interaction_type={interaction_type}, limit={limit}, offset={offset}")
+    logger.info(f"Getting unified simulations with params: entity_id={entity_id}, entity_type_id={entity_type_id}, interaction_type={interaction_type}, limit={limit}, offset={offset}, includeBatchSims={include_batch_sims}")
     
     # Get all simulations directly from the database to verify they exist
     try:
@@ -1388,6 +1390,19 @@ def get_unified_simulations():
     for sim in simulations:
         logger.info(f"Processing simulation: {sim.get('id')}")
         try:
+            # Skip batch simulations if includeBatchSims is false
+            metadata = sim.get('metadata', {})
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except:
+                    metadata = {}
+            
+            # If includeBatchSims is false and this simulation is part of a batch, skip it
+            if not include_batch_sims and metadata.get('batch_id'):
+                logger.info(f"Skipping batch simulation: {sim.get('id')}")
+                continue
+            
             # Get the context
             context_id = sim.get('context_id')
             if context_id:
@@ -1417,7 +1432,8 @@ def get_unified_simulations():
                 "entity_ids": entity_ids,
                 "entity_names": entity_names,
                 "created_at": sim.get('timestamp', ''),
-                "summary": sim.get('metadata', {}).get('summary', ''),
+                "summary": metadata.get('summary', ''),
+                "metadata": metadata,
                 "final_turn_number": sim.get('final_turn_number', 0),
                 "name": sim.get('name', f"Simulation {sim.get('timestamp', '')[:10]}")
             })

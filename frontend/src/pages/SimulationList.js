@@ -17,6 +17,17 @@ const SimulationList = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Filter for showing batch simulations
+  const [showBatchSims, setShowBatchSims] = useState(() => {
+    const savedFilter = localStorage.getItem('showBatchSimulations');
+    return savedFilter === 'true'; // Default to false if not set
+  });
+  
+  // Save filter preference
+  useEffect(() => {
+    localStorage.setItem('showBatchSimulations', showBatchSims);
+  }, [showBatchSims]);
+  
   // Initialize activeTab from localStorage or URL params, defaulting to 'individual'
   const [activeTab, setActiveTab] = useState(() => {
     // Check if tab is specified in URL params
@@ -97,7 +108,12 @@ const SimulationList = () => {
         setLoading(true);
         
         // Build query parameters
-        const params = { limit, offset };
+        const params = { 
+          limit, 
+          offset,
+          // Only include batch simulations if the filter is enabled
+          includeBatchSims: showBatchSims
+        };
         
         const response = await unifiedSimulationApi.getAll(params);
         if (response && response.status === 'success') {
@@ -123,7 +139,7 @@ const SimulationList = () => {
     if (activeTab === 'individual') {
       fetchSimulations();
     }
-  }, [limit, offset, activeTab]);
+  }, [limit, offset, activeTab, showBatchSims]);
 
   useEffect(() => {
     const fetchBatchSimulations = async () => {
@@ -346,12 +362,6 @@ const SimulationList = () => {
         <h1 className="text-2xl font-bold text-blue-300">
           Simulations
         </h1>
-        <button 
-          className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors"
-          onClick={activeTab === 'individual' ? handleCreateSimulation : handleCreateBatchSimulation}
-        >
-          Create New {activeTab === 'individual' ? 'Simulation' : 'Batch Simulation'}
-        </button>
       </div>
       
       {/* Tabs */}
@@ -397,6 +407,35 @@ const SimulationList = () => {
             </div>
           )}
           
+          <div className="mb-6 flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-xl font-semibold text-blue-300">Individual Simulations</h2>
+              
+              {/* Batch simulation filter toggle */}
+              <div className="flex items-center">
+                <label className="inline-flex items-center cursor-pointer">
+                  <span className="text-sm text-gray-300 mr-2">Show batch sims</span>
+                  <div className="relative">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={showBatchSims} 
+                      onChange={() => setShowBatchSims(!showBatchSims)}
+                    />
+                    <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </div>
+                </label>
+              </div>
+            </div>
+            
+            <button 
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors"
+              onClick={handleCreateSimulation}
+            >
+              Create New Simulation
+            </button>
+          </div>
+          
           {loading ? (
             <div className="flex justify-center items-center py-8">
               <LoadingIndicator />
@@ -436,6 +475,15 @@ const SimulationList = () => {
                       <div className="flex mb-3 gap-2 flex-wrap">
                         <span className="bg-gray-700 text-gray-300 text-xs font-medium px-2.5 py-1 rounded-full">
                           {simulation.entity_ids?.length || 0} entities
+                        </span>
+                        
+                        {/* Add tag showing if this is a batch or individual simulation */}
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                          simulation.metadata?.batch_id 
+                            ? 'bg-purple-900 text-purple-300' 
+                            : 'bg-blue-900 text-blue-300'
+                        }`}>
+                          {simulation.metadata?.batch_id ? 'batch sim' : 'individual sim'}
                         </span>
                         
                         {simulation.final_turn_number && (
@@ -502,6 +550,19 @@ const SimulationList = () => {
               {batchError}
             </div>
           )}
+          
+          <div className="mb-6 flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-xl font-semibold text-blue-300">Batch Simulations</h2>
+            </div>
+            
+            <button 
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors"
+              onClick={handleCreateBatchSimulation}
+            >
+              Create New Batch Simulation
+            </button>
+          </div>
           
           {batchLoading ? (
             <div className="flex justify-center items-center py-8">
