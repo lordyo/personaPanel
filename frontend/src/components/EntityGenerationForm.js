@@ -15,8 +15,7 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
   const [entityDescription, setEntityDescription] = useState('');
   const [count, setCount] = useState(1);
   const [variability, setVariability] = useState(0.5);
-  const [useBatchGeneration, setUseBatchGeneration] = useState(true);
-  const [generationMethod, setGenerationMethod] = useState('multi-step'); // Default to multi-step method
+  const [generationMode, setGenerationMode] = useState('fuel'); // Default to fuel method (previously multi-step)
   const [error, setError] = useState(null);
   
   // Load saved settings from localStorage when component mounts
@@ -42,10 +41,8 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
     const savedCount = localStorage.getItem('entityGenerationSettings.count');
     // Load variability if saved
     const savedVariability = localStorage.getItem('entityGenerationSettings.variability');
-    // Load batch generation preference if saved
-    const savedUseBatch = localStorage.getItem('entityGenerationSettings.useBatchGeneration');
-    // Load generation method if saved
-    const savedGenerationMethod = localStorage.getItem('entityGenerationSettings.generationMethod');
+    // Load generation mode if saved
+    const savedGenerationMode = localStorage.getItem('entityGenerationSettings.generationMode');
     
     // Apply saved settings if they exist
     if (savedEntityTypeId) {
@@ -83,12 +80,8 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
       }
     }
     
-    if (savedUseBatch) {
-      setUseBatchGeneration(savedUseBatch === 'true');
-    }
-
-    if (savedGenerationMethod) {
-      setGenerationMethod(savedGenerationMethod);
+    if (savedGenerationMode) {
+      setGenerationMode(savedGenerationMode);
     }
   }, [entityTypes, defaultEntityTypeId]);
   
@@ -127,20 +120,12 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
     localStorage.setItem('entityGenerationSettings.variability', value);
   };
   
-  // Handle batch generation option changes
-  const handleBatchGenerationChange = (e) => {
-    const useBatch = e.target.checked;
-    setUseBatchGeneration(useBatch);
+  // Handle generation mode changes
+  const handleGenerationModeChange = (e) => {
+    const mode = e.target.value;
+    setGenerationMode(mode);
     // Save to localStorage
-    localStorage.setItem('entityGenerationSettings.useBatchGeneration', useBatch);
-  };
-
-  // Handle generation method changes
-  const handleGenerationMethodChange = (e) => {
-    const method = e.target.value;
-    setGenerationMethod(method);
-    // Save to localStorage
-    localStorage.setItem('entityGenerationSettings.generationMethod', method);
+    localStorage.setItem('entityGenerationSettings.generationMode', mode);
   };
   
   // Handle form submission
@@ -164,14 +149,28 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
       return;
     }
     
+    // Convert generation mode to the parameters expected by the API
+    let useBatchGeneration = false;
+    let generationMethod = 'batch';
+    
+    if (generationMode === 'simple') {
+      useBatchGeneration = false;
+    } else if (generationMode === 'batch') {
+      useBatchGeneration = true;
+      generationMethod = 'batch';
+    } else if (generationMode === 'fuel') {
+      useBatchGeneration = true;
+      generationMethod = 'multi-step';
+    }
+    
     // Submit form
     onSubmit({
       entityTypeId,
       entityDescription,
       count,
       variability,
-      useBatchGeneration, // Include the batch generation preference
-      generationMethod // Include the generation method
+      useBatchGeneration,
+      generationMethod
     });
   };
   
@@ -260,65 +259,68 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
         </div>
         
         <div className="mb-6">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              className="form-checkbox h-5 w-5 text-blue-600"
-              checked={useBatchGeneration}
-              onChange={handleBatchGenerationChange}
-              disabled={disabled}
-            />
-            <span className="ml-2 text-gray-700 dark:text-gray-300">Use batch generation for more diverse entities</span>
+          <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
+            Generation Mode
           </label>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 ml-7">
-            Batch generation creates multiple entities in a single request, resulting in greater diversity.
-            By default, we use the new multi-step approach with bisociative fueling for maximum creativity.
-            <strong> Highly recommended</strong> when generating multiple entities.
-          </p>
-        </div>
-
-        {useBatchGeneration && (
-          <div className="mb-6">
-            <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
-              Generation Method
+          <div className="space-y-3 mt-2">
+            <label className="flex items-start">
+              <input
+                type="radio"
+                className="form-radio mt-1"
+                name="generationMode"
+                value="simple"
+                checked={generationMode === "simple"}
+                onChange={handleGenerationModeChange}
+                disabled={disabled}
+              />
+              <div className="ml-2">
+                <span className="text-gray-700 dark:text-gray-300">Simple Mode</span>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Generates each entity individually. Best for 1-3 entities when consistency is more important than diversity.
+                </p>
+              </div>
             </label>
-            <div className="flex flex-col space-y-2">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  className="form-radio"
-                  name="generationMethod"
-                  value="multi-step"
-                  checked={generationMethod === "multi-step"}
-                  onChange={handleGenerationMethodChange}
-                  disabled={disabled}
-                />
-                <span className="ml-2 text-gray-700 dark:text-gray-300">Multi-step (recommended)</span>
-              </label>
-              <p className="text-xs text-gray-600 dark:text-gray-400 ml-6 mb-2">
-                Uses a two-step approach with "bisociative fueling" (random inspiring words) to boost creativity.
-                This method generates each dimension separately and then combines them with creative elements
-                to produce highly varied names, backstories, and characteristics.
-              </p>
-              
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  className="form-radio"
-                  name="generationMethod"
-                  value="batch"
-                  checked={generationMethod === "batch"}
-                  onChange={handleGenerationMethodChange}
-                  disabled={disabled}
-                />
-                <span className="ml-2 text-gray-700 dark:text-gray-300">Classic batch</span>
-              </label>
-              <p className="text-xs text-gray-600 dark:text-gray-400 ml-6">
-                Uses the original batch generation method, which creates multiple entities in a single request.
-              </p>
-            </div>
+            
+            <label className="flex items-start">
+              <input
+                type="radio"
+                className="form-radio mt-1"
+                name="generationMode"
+                value="batch"
+                checked={generationMode === "batch"}
+                onChange={handleGenerationModeChange}
+                disabled={disabled}
+              />
+              <div className="ml-2">
+                <span className="text-gray-700 dark:text-gray-300">Batch Mode</span>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Generates up to 10 entities in a single request for better efficiency.
+                  Provides moderate diversity between entities.
+                </p>
+              </div>
+            </label>
+            
+            <label className="flex items-start">
+              <input
+                type="radio"
+                className="form-radio mt-1"
+                name="generationMode"
+                value="fuel"
+                checked={generationMode === "fuel"}
+                onChange={handleGenerationModeChange}
+                disabled={disabled}
+              />
+              <div className="ml-2">
+                <span className="text-gray-700 dark:text-gray-300">Bisociative Fuel Mode (Recommended)</span>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Uses a two-step approach with "bisociative fueling" (random inspiring words) to boost creativity.
+                  Produces highly varied names, backstories, and characteristics.
+                  Recommended for creating diverse entities.
+                </p>
+              </div>
+            </label>
           </div>
-        )}
+        </div>
         
         <div className="flex items-center justify-between">
           <button
@@ -327,8 +329,8 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
             disabled={disabled}
           >
             Generate
-            {useBatchGeneration && generationMethod === 'multi-step' && (
-              <span className="ml-2 bg-blue-700 text-xs px-2 py-1 rounded-full">Multi-Step</span>
+            {generationMode === 'fuel' && (
+              <span className="ml-2 bg-blue-700 text-xs px-2 py-1 rounded-full">Bisociative</span>
             )}
           </button>
         </div>

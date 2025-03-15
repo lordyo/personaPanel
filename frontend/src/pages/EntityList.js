@@ -6,7 +6,6 @@ import EntityForm from '../components/EntityForm';
 import EntityGenerationForm from '../components/EntityGenerationForm';
 import EntityDetail from '../components/EntityDetail';
 import LoadingIndicator from '../components/LoadingIndicator';
-import MultiStepInfo from '../components/MultiStepInfo';
 import { toast } from 'react-hot-toast';
 
 /**
@@ -200,6 +199,7 @@ const EntityList = () => {
     
     setGeneratingEntities(false);
     setError(null);
+    setLoading(true); // Set loading to true when starting generation
     
     try {
       let newEntities = [];
@@ -207,6 +207,15 @@ const EntityList = () => {
       if (useBatchGeneration) {
         console.log('Using multi-step generation API for more diverse entities');
         const batchSize = Math.min(count, 10); // Limit batch size to 10
+        
+        // Show the specific generation method in the loading indicator
+        if (generationMethod === 'multi-step') {
+          toast.loading(`Generating ${batchSize} entities using Bisociative Fuel mode...`, { id: 'generation-toast' });
+        } else if (useBatchGeneration) {
+          toast.loading(`Generating ${batchSize} entities using Batch mode...`, { id: 'generation-toast' });
+        } else {
+          toast.loading(`Generating ${count} entities using Simple mode...`, { id: 'generation-toast' });
+        }
         
         // Use batch generation endpoint
         newEntities = await api.generateEntityBatch(
@@ -217,8 +226,9 @@ const EntityList = () => {
           generationMethod // Pass the generation method to the API
         );
       } else {
-        // Generate entities one by one (old method)
+        // Simple mode (one by one)
         console.log('Generating entities one by one');
+        toast.loading(`Generating ${count} entities using Simple mode...`, { id: 'generation-toast' });
         
         // Create an array of promises for generating entities
         const entityPromises = Array(count)
@@ -232,25 +242,30 @@ const EntityList = () => {
       // Refresh entities after generation
       await fetchData();
       
+      // Dismiss the loading toast and show success notification
+      toast.dismiss('generation-toast');
+      
       // Show toast notification with generation method information
-      if (useBatchGeneration) {
-        const methodName = generationMethod === 'multi-step' ? 'multi-step bisociative' : 'classic batch';
+      if (generationMethod === 'multi-step' && useBatchGeneration) {
         toast.success(
           <div>
-            <strong>Success!</strong> Generated {newEntities.length} entities using {methodName} generation.
-            {generationMethod === 'multi-step' && 
-              <p className="text-sm mt-1">Enhanced diversity with unique names and backstories.</p>
-            }
+            <strong>Success!</strong> Generated {newEntities.length} entities using Bisociative Fuel mode.
+            <p className="text-sm mt-1">Enhanced diversity with unique names and backstories.</p>
           </div>,
           { duration: 5000 }
         );
+      } else if (useBatchGeneration) {
+        toast.success(`Generated ${newEntities.length} entities using Batch mode.`);
       } else {
-        toast.success(`Generated ${newEntities.length} entities individually.`);
+        toast.success(`Generated ${newEntities.length} entities using Simple mode.`);
       }
     } catch (err) {
       console.error('Error generating entities:', err);
       setError(`Failed to generate entities: ${err.message}`);
+      toast.dismiss('generation-toast');
       toast.error(`Failed to generate entities: ${err.message}`);
+    } finally {
+      setLoading(false); // Set loading to false when generation completes
     }
   };
   
@@ -354,9 +369,6 @@ const EntityList = () => {
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <h1 className="text-3xl font-bold text-white mb-8">Entity Management</h1>
-      
-      {/* Info message about new multi-step generation */}
-      <MultiStepInfo />
       
       {/* Controls and filters */}
       <div className="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
