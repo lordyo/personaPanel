@@ -19,11 +19,18 @@ import sys
 import os.path
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
-# Import the batch entity creator - use absolute path to avoid import issues
-from llm.batch_entity_creator import (
-    BatchEntityCreator, 
+# Import the multi-step entity creator for improved diversity
+from llm.multi_step_entity_creator import (
+    MultiStepEntityCreator, 
     load_config, 
     setup_dspy, 
+    generate_entities_parallel,
+    get_random_bisociative_words
+)
+
+# As a fallback, also import the batch entity creator
+from llm.batch_entity_creator import (
+    BatchEntityCreator, 
     MAX_PARALLEL_ENTITIES
 )
 
@@ -36,14 +43,15 @@ load_dotenv()
 # Create a Blueprint for batch entity routes
 batch_entity_bp = Blueprint('batch_entity', __name__)
 
-# Initialize the batch entity creator - we'll do this once when the module loads
+# Initialize the multi-step entity creator - we'll do this once when the module loads
 # rather than on each request
 creator = None
+batch_creator = None  # Fallback creator
 create_error = None
 
 def get_creator():
-    """Get the batch entity creator, initializing it if needed."""
-    global creator, create_error
+    """Get the multi-step entity creator, initializing it if needed."""
+    global creator, batch_creator, create_error
     
     if creator is not None:
         return creator, None
@@ -54,12 +62,17 @@ def get_creator():
         if not setup_dspy({}):
             raise Exception("Failed to set up DSPy with default settings")
         
-        # Create a new batch entity creator
-        creator = BatchEntityCreator()
-        print("Successfully initialized batch entity creator")
+        # Create a new multi-step entity creator
+        creator = MultiStepEntityCreator()
+        print("Successfully initialized multi-step entity creator")
+        
+        # Also initialize batch creator as fallback
+        batch_creator = BatchEntityCreator()
+        print("Successfully initialized batch entity creator (as fallback)")
+        
         return creator, None
     except Exception as e:
-        error_msg = f"Error initializing batch entity creator: {str(e)}"
+        error_msg = f"Error initializing entity creator: {str(e)}"
         create_error = error_msg
         print(error_msg)
         print(traceback.format_exc())
@@ -73,13 +86,14 @@ def generate_batch():
     """
     Generate a batch of diverse, unique entities in a single request.
     
-    This endpoint is optimized to create multiple entities that are more diverse from each other
-    than when generated individually, helping avoid similar names and descriptions.
+    This endpoint uses the multi-step entity generation approach with
+    bisociative fueling for higher inter-entity variance, producing entities
+    with more diverse names, descriptions, and characteristics.
     """
-    global creator, create_error
+    global creator, batch_creator, create_error
     
     # Check if creator is initialized
-    if creator is None:
+    if creator is None and batch_creator is None:
         if create_error:
             error_msg = create_error
         else:
@@ -114,7 +128,13 @@ def generate_batch():
         dimensions = data.get("dimensions", [])
         output_fields = data.get("output_fields", [])
         
+        # Check if the user explicitly requested a specific generation method
+        # Default to multi-step if not specified
+        generation_method = data.get("generation_method", "multi-step").lower()
+        use_multi_step = generation_method != "batch"
+        
         print(f"Parsed fields: entity_type={entity_type}, dimensions={len(dimensions)}, output_fields={len(output_fields)}")
+        print(f"Using {'multi-step' if use_multi_step else 'batch'} generation method")
         
         # Use a higher default variability to encourage more diverse entities
         variability = float(data.get("variability", 0.7))
@@ -151,17 +171,40 @@ def generate_batch():
         asyncio.set_event_loop(loop)
         
         try:
-            # Run the async generator in the event loop
-            entities = loop.run_until_complete(
-                creator.generate_batch_async(
-                    entity_type=entity_type,
-                    entity_description=entity_description,
-                    dimensions=dimensions,
-                    variability=variability,
-                    batch_size=batch_size,
-                    output_fields=output_fields
+            # Run the appropriate generation method
+            if use_multi_step and creator is not None:
+                # Use multi-step entity generation with bisociative fueling
+                print(f"Generating {batch_size} entities using multi-step approach with bisociative fueling")
+                entities = loop.run_until_complete(
+                    generate_entities_parallel(
+                        creator=creator,
+                        entity_type=entity_type,
+                        entity_description=entity_description,
+                        dimensions=dimensions,
+                        variability=variability,
+                        output_fields=output_fields,
+                        num_entities=batch_size,
+                        max_parallel=MAX_PARALLEL_ENTITIES
+                    )
                 )
-            )
+                print(f"Successfully generated {len(entities)} entities using multi-step approach")
+                print(f"Entity names: {', '.join([entity.name for entity in entities])}")
+            else:
+                # Fallback to batch generation if multi-step is not available
+                # or explicitly requested
+                print(f"Generating {batch_size} entities using batch approach (fallback)")
+                entities = loop.run_until_complete(
+                    batch_creator.generate_batch_async(
+                        entity_type=entity_type,
+                        entity_description=entity_description,
+                        dimensions=dimensions,
+                        variability=variability,
+                        batch_size=batch_size,
+                        output_fields=output_fields
+                    )
+                )
+                print(f"Successfully generated {len(entities)} entities using batch approach")
+                print(f"Entity names: {', '.join([entity.name for entity in entities])}")
         finally:
             # Close the loop when done
             loop.close()
@@ -238,6 +281,7 @@ def generate_batch():
             "entity_type_id": entity_type_id,
             "entities": response_entities,
             "entity_ids": entity_ids,
+            "generation_method": "multi-step" if use_multi_step else "batch",
             "diversity_optimized": True
         }), 200
         
@@ -254,32 +298,29 @@ def generate_batch():
 
 @batch_entity_bp.route('/config', methods=['GET'])
 def get_config():
-    """
-    Get the current configuration for batch entity generation
+    """Get the configuration of the batch entity generator."""
+    global creator, batch_creator, create_error
     
-    Returns the maximum number of entities that can be generated in a batch
-    and whether the creator has been initialized.
-    """
-    global creator, create_error
-    
-    # Get creator status
-    is_initialized = creator is not None
-    error = create_error if not is_initialized else None
+    status = "ok" if creator is not None or batch_creator is not None else "error"
     
     return jsonify({
+        "status": status,
         "max_parallel_entities": MAX_PARALLEL_ENTITIES,
-        "initialized": is_initialized,
-        "error": error,
-        "version": "1.0.2"
-    }), 200
+        "multi_step_enabled": creator is not None,
+        "batch_enabled": batch_creator is not None,
+        "error": create_error if create_error else None,
+        "default_method": "multi-step",
+        "generation_methods": ["multi-step", "batch"]
+    }), 200 if status == "ok" else 500
 
 @batch_entity_bp.route('/health', methods=['GET'])
 def health_check():
-    """Simple health check endpoint for the batch entity API."""
-    global creator, create_error
+    """Health check endpoint."""
+    global creator, batch_creator, create_error
+    
+    status = "ok" if creator is not None or batch_creator is not None else "error"
     
     return jsonify({
-        "status": "online", 
-        "creator_initialized": creator is not None,
-        "initialization_error": create_error
-    }), 200 
+        "status": status,
+        "message": "Entity batch service is ready" if status == "ok" else create_error
+    }), 200 if status == "ok" else 500 

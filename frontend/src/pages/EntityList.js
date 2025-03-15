@@ -6,6 +6,8 @@ import EntityForm from '../components/EntityForm';
 import EntityGenerationForm from '../components/EntityGenerationForm';
 import EntityDetail from '../components/EntityDetail';
 import LoadingIndicator from '../components/LoadingIndicator';
+import MultiStepInfo from '../components/MultiStepInfo';
+import { toast } from 'react-hot-toast';
 
 /**
  * Page component for listing, generating, and managing entity instances.
@@ -188,115 +190,67 @@ const EntityList = () => {
     }
   };
   
+  /**
+   * Handles the generation of new entities based on form input
+   * 
+   * @param {Object} formData - The form data from the EntityGenerationForm
+   */
   const handleGenerateEntities = async (formData) => {
+    const { entityTypeId, entityDescription, count, variability, useBatchGeneration, generationMethod } = formData;
+    
+    setGeneratingEntities(false);
+    setError(null);
+    
     try {
-      setGeneratingEntities(false); // Hide the form
-      setLoading(true); // Show loading indicator
-      setError(null);
+      let newEntities = [];
       
-      // Find the entity type first to ensure we have the name
-      const entityType = entityTypes.find(et => et.id === formData.entityTypeId);
-      if (!entityType) {
-        throw new Error("Entity type not found");
+      if (useBatchGeneration) {
+        console.log('Using multi-step generation API for more diverse entities');
+        const batchSize = Math.min(count, 10); // Limit batch size to 10
+        
+        // Use batch generation endpoint
+        newEntities = await api.generateEntityBatch(
+          entityTypeId,
+          batchSize,
+          variability,
+          entityDescription,
+          generationMethod // Pass the generation method to the API
+        );
+      } else {
+        // Generate entities one by one (old method)
+        console.log('Generating entities one by one');
+        
+        // Create an array of promises for generating entities
+        const entityPromises = Array(count)
+          .fill()
+          .map(() => api.generateEntity(entityTypeId, variability, entityDescription));
+        
+        // Wait for all entity promises to resolve
+        newEntities = await Promise.all(entityPromises);
       }
       
-      console.log("Generating entities with form data:", formData);
+      // Refresh entities after generation
+      await fetchData();
       
-      let response;
-      
-      // Check if we should use batch generation for more diverse entities
-      if (formData.useBatchGeneration && formData.count > 1) {
-        // Use batch generation for multiple entities
-        console.log("Using batch generation API for diverse entities");
-        
-        // The batch size is limited to MAX_PARALLEL_ENTITIES (default: 10)
-        // If more entities are requested, we'll make multiple batch requests
-        const batchSize = Math.min(formData.count, 10); // Assuming MAX_PARALLEL_ENTITIES is 10
-        
-        response = await api.generateEntityBatch(
-          formData.entityTypeId,
-          batchSize, 
-          formData.variability,
-          formData.entityDescription
+      // Show toast notification with generation method information
+      if (useBatchGeneration) {
+        const methodName = generationMethod === 'multi-step' ? 'multi-step bisociative' : 'classic batch';
+        toast.success(
+          <div>
+            <strong>Success!</strong> Generated {newEntities.length} entities using {methodName} generation.
+            {generationMethod === 'multi-step' && 
+              <p className="text-sm mt-1">Enhanced diversity with unique names and backstories.</p>
+            }
+          </div>,
+          { duration: 5000 }
         );
-        
-        console.log("Batch generation response:", response);
       } else {
-        // Use standard entity generation
-        console.log("Using standard entity generation API");
-        
-        response = await api.generateEntities(
-          formData.entityTypeId,
-          formData.count,
-          formData.variability,
-          formData.entityDescription
-        );
-        
-        console.log("Generation response:", response);
-      }
-      
-      if (response.status === 'success') {
-        // Check if the response has entities directly in it
-        // Handle different response formats: either entities at the top level or nested in data
-        let newEntities = [];
-        
-        if (response.data && response.data.entities && Array.isArray(response.data.entities)) {
-          // Format 1: Entities nested in 'data' property
-          newEntities = response.data.entities;
-        } else if (response.entities && Array.isArray(response.entities)) {
-          // Format 2: Entities at the top level
-          newEntities = response.entities;
-        }
-        
-        if (newEntities.length > 0) {
-          // Add entity_type_name to each entity for display purposes
-          const processedEntities = newEntities.map(entity => ({
-            ...entity,
-            entity_type_id: formData.entityTypeId,
-            entity_type_name: entityType.name || 'Unknown Type'
-          }));
-          
-          console.log("Processed entities:", processedEntities);
-          
-          // Update the entities state
-          setEntities(prevEntities => {
-            // Filter out any entities of this type that might have the same ID
-            // This ensures we don't have duplicates
-            const existingEntitiesFiltered = prevEntities.filter(entity => 
-              !processedEntities.some(newEntity => newEntity.id === entity.id)
-            );
-            
-            // Create new entities list with the processed entities added
-            const updatedEntities = [...existingEntitiesFiltered, ...processedEntities];
-            
-            // Update filtered entities when we add new entities
-            setFilteredEntities(prevFiltered => {
-              if (filterTypeId && filterTypeId !== formData.entityTypeId) {
-                // Keep the current filtered list if we're filtering by a different type
-                return prevFiltered;
-              } else {
-                // Otherwise update the filtered list as well (either no filter or same type)
-                return updatedEntities;
-              }
-            });
-            
-            return updatedEntities;
-          });
-          
-          setError(null);
-        } else {
-          // Fallback - refetch all entities if we don't get entities directly
-          await fetchData();
-        }
-      } else {
-        // Handle error in response
-        setError(`Error: ${response.message || 'Failed to generate entities'}`);
+        toast.success(`Generated ${newEntities.length} entities individually.`);
       }
     } catch (err) {
-      console.error("Error generating entities:", err);
-      setError(`Error generating entities: ${err.message || 'Unknown error'}`);
-    } finally {
-      setLoading(false);
+      console.error('Error generating entities:', err);
+      setError(`Failed to generate entities: ${err.message}`);
+      toast.error(`Failed to generate entities: ${err.message}`);
     }
   };
   
@@ -400,6 +354,9 @@ const EntityList = () => {
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <h1 className="text-3xl font-bold text-white mb-8">Entity Management</h1>
+      
+      {/* Info message about new multi-step generation */}
+      <MultiStepInfo />
       
       {/* Controls and filters */}
       <div className="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">

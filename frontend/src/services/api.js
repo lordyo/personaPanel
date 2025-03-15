@@ -342,16 +342,16 @@ const entityApi = {
   deleteByType: (entityTypeId) => del(`/entity-types/${entityTypeId}/entities`),
 
   /**
-   * Generate multiple diverse entities in a single batch request.
-   * This provides better diversity between entities than generating them individually.
+   * Generate a batch of entities
    * 
-   * @param {string} entityTypeId - The entity type id
-   * @param {number} batchSize - Number of entities to generate in batch (1-10)
+   * @param {string} entityTypeId - ID of the entity type
+   * @param {number} batchSize - Number of entities to generate
    * @param {number} variability - Variability level (0-1)
    * @param {string} entityDescription - Optional description to guide entity generation
+   * @param {string} generationMethod - The generation method to use: 'multi-step' (default) or 'batch'
    * @returns {Promise} - The generated batch of entities
    */
-  generateEntityBatch: (entityTypeId, batchSize = 5, variability = 0.7, entityDescription = '') => {
+  generateEntityBatch: (entityTypeId, batchSize = 5, variability = 0.7, entityDescription = '', generationMethod = 'multi-step') => {
     // Find the entity type to get its dimensions and other metadata
     return get(`/entity-types/${entityTypeId}`)
       .then(response => {
@@ -376,7 +376,8 @@ const entityApi = {
           dimensions: entityType.dimensions || [],
           batch_size: batchSize,
           variability: variability,
-          output_fields: entityType.output_fields || []
+          output_fields: entityType.output_fields || [],
+          generation_method: generationMethod // Add the generation method to the request
         };
         
         // The API_URL already includes "/api", so we don't need to add it again

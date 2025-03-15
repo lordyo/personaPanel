@@ -16,6 +16,7 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
   const [count, setCount] = useState(1);
   const [variability, setVariability] = useState(0.5);
   const [useBatchGeneration, setUseBatchGeneration] = useState(true);
+  const [generationMethod, setGenerationMethod] = useState('multi-step'); // Default to multi-step method
   const [error, setError] = useState(null);
   
   // Load saved settings from localStorage when component mounts
@@ -43,6 +44,8 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
     const savedVariability = localStorage.getItem('entityGenerationSettings.variability');
     // Load batch generation preference if saved
     const savedUseBatch = localStorage.getItem('entityGenerationSettings.useBatchGeneration');
+    // Load generation method if saved
+    const savedGenerationMethod = localStorage.getItem('entityGenerationSettings.generationMethod');
     
     // Apply saved settings if they exist
     if (savedEntityTypeId) {
@@ -83,7 +86,11 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
     if (savedUseBatch) {
       setUseBatchGeneration(savedUseBatch === 'true');
     }
-  }, [entityTypes]);
+
+    if (savedGenerationMethod) {
+      setGenerationMethod(savedGenerationMethod);
+    }
+  }, [entityTypes, defaultEntityTypeId]);
   
   // Update description when entity type changes
   const handleEntityTypeChange = (e) => {
@@ -102,86 +109,79 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
     localStorage.setItem('entityGenerationSettings.entityTypeId', newTypeId);
   };
   
-  // Handle count input change
+  // Handle count changes
   const handleCountChange = (e) => {
-    const newCount = parseInt(e.target.value);
-    if (!isNaN(newCount) && newCount >= 1 && newCount <= 50) {
-      setCount(newCount);
-      
+    const value = parseInt(e.target.value);
+    if (!isNaN(value) && value >= 1 && value <= 50) {
+      setCount(value);
       // Save to localStorage
-      localStorage.setItem('entityGenerationSettings.count', newCount);
+      localStorage.setItem('entityGenerationSettings.count', value);
     }
   };
   
-  // Handle variability slider change
+  // Handle variability changes
   const handleVariabilityChange = (e) => {
-    const newVariability = parseFloat(e.target.value);
-    if (!isNaN(newVariability) && newVariability >= 0 && newVariability <= 1) {
-      setVariability(newVariability);
-      
-      // Save to localStorage
-      localStorage.setItem('entityGenerationSettings.variability', newVariability);
-    }
+    const value = parseFloat(e.target.value);
+    setVariability(value);
+    // Save to localStorage
+    localStorage.setItem('entityGenerationSettings.variability', value);
   };
   
-  // Handle batch generation toggle
+  // Handle batch generation option changes
   const handleBatchGenerationChange = (e) => {
     const useBatch = e.target.checked;
     setUseBatchGeneration(useBatch);
-    
     // Save to localStorage
     localStorage.setItem('entityGenerationSettings.useBatchGeneration', useBatch);
-    
-    // If batch generation is enabled, increase variability for better diversity
-    if (useBatch) {
-      setVariability(Math.max(variability, 0.7));
-    }
+  };
+
+  // Handle generation method changes
+  const handleGenerationMethodChange = (e) => {
+    const method = e.target.value;
+    setGenerationMethod(method);
+    // Save to localStorage
+    localStorage.setItem('entityGenerationSettings.generationMethod', method);
   };
   
-  // Form submission handler
+  // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
+    setError(null);
     
-    // Validate the form
+    // Validate form
     if (!entityTypeId) {
       setError('Please select an entity type');
       return;
     }
     
-    // Check if count is valid
-    const countInt = parseInt(count);
-    if (isNaN(countInt) || countInt < 1 || countInt > 50) {
+    if (count < 1 || count > 50) {
       setError('Count must be between 1 and 50');
       return;
     }
     
-    // Check if variability is valid
-    const variabilityFloat = parseFloat(variability);
-    if (isNaN(variabilityFloat) || variabilityFloat < 0 || variabilityFloat > 1) {
+    if (variability < 0 || variability > 1) {
       setError('Variability must be between 0 and 1');
       return;
     }
     
-    // Prepare form data to submit
-    const formData = {
+    // Submit form
+    onSubmit({
       entityTypeId,
       entityDescription,
-      count: countInt,
-      variability: variabilityFloat,
-      useBatchGeneration // Include the batch generation preference
-    };
-    
-    // Submit the form
-    onSubmit(formData);
+      count,
+      variability,
+      useBatchGeneration, // Include the batch generation preference
+      generationMethod // Include the generation method
+    });
   };
-
+  
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
-      <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Generate Entities</h2>
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+      <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Generate Entities</h2>
       
       {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-          <p>{error}</p>
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+          {error}
         </div>
       )}
       
@@ -197,6 +197,7 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
             onChange={handleEntityTypeChange}
             disabled={disabled}
           >
+            <option value="">Select an entity type</option>
             {entityTypes.map(type => (
               <option key={type.id} value={type.id}>
                 {type.name}
@@ -207,16 +208,16 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
         
         <div className="mb-4">
           <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="entityDescription">
-            Entity Description (Optional)
+            Entity Description (optional)
           </label>
           <textarea
             id="entityDescription"
             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 dark:text-gray-300 dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            placeholder="Additional description to guide entity generation"
             value={entityDescription}
             onChange={(e) => setEntityDescription(e.target.value)}
+            placeholder="Optional custom description to guide entity generation"
+            rows={3}
             disabled={disabled}
-            rows="3"
           />
         </div>
         
@@ -246,7 +247,7 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
             min="0"
             max="1"
             step="0.1"
-            className="w-full"
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
             value={variability}
             onChange={handleVariabilityChange}
             disabled={disabled}
@@ -270,19 +271,65 @@ const EntityGenerationForm = ({ entityTypes, onSubmit, disabled = false, default
             <span className="ml-2 text-gray-700 dark:text-gray-300">Use batch generation for more diverse entities</span>
           </label>
           <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 ml-7">
-            Batch generation creates multiple entities at once, resulting in greater diversity between them.
-            The AI will ensure each entity has a distinct name, appearance, and characteristics.
-            <strong>Highly recommended</strong> when generating multiple entities.
+            Batch generation creates multiple entities in a single request, resulting in greater diversity.
+            By default, we use the new multi-step approach with bisociative fueling for maximum creativity.
+            <strong> Highly recommended</strong> when generating multiple entities.
           </p>
         </div>
+
+        {useBatchGeneration && (
+          <div className="mb-6">
+            <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
+              Generation Method
+            </label>
+            <div className="flex flex-col space-y-2">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  className="form-radio"
+                  name="generationMethod"
+                  value="multi-step"
+                  checked={generationMethod === "multi-step"}
+                  onChange={handleGenerationMethodChange}
+                  disabled={disabled}
+                />
+                <span className="ml-2 text-gray-700 dark:text-gray-300">Multi-step (recommended)</span>
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 ml-6 mb-2">
+                Uses a two-step approach with "bisociative fueling" (random inspiring words) to boost creativity.
+                This method generates each dimension separately and then combines them with creative elements
+                to produce highly varied names, backstories, and characteristics.
+              </p>
+              
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  className="form-radio"
+                  name="generationMethod"
+                  value="batch"
+                  checked={generationMethod === "batch"}
+                  onChange={handleGenerationMethodChange}
+                  disabled={disabled}
+                />
+                <span className="ml-2 text-gray-700 dark:text-gray-300">Classic batch</span>
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 ml-6">
+                Uses the original batch generation method, which creates multiple entities in a single request.
+              </p>
+            </div>
+          </div>
+        )}
         
         <div className="flex items-center justify-between">
           <button
             type="submit"
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex items-center"
             disabled={disabled}
           >
             Generate
+            {useBatchGeneration && generationMethod === 'multi-step' && (
+              <span className="ml-2 bg-blue-700 text-xs px-2 py-1 rounded-full">Multi-Step</span>
+            )}
           </button>
         </div>
       </form>
