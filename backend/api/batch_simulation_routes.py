@@ -304,7 +304,6 @@ def export_batch_simulation(batch_id):
         )
         
         # Add headers to ensure the browser treats this as a download
-        response.headers.add('Content-Disposition', f'attachment; filename="batch_simulation_{batch_id}{filename_suffix}.json"')
         response.headers.add('Access-Control-Allow-Origin', '*')
         response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
@@ -388,7 +387,6 @@ def export_batch_simulation(batch_id):
         )
         
         # Add headers to ensure the browser treats this as a download
-        response.headers.add('Content-Disposition', f'attachment; filename="batch_simulation_{batch_id}{filename_suffix}.csv"')
         response.headers.add('Access-Control-Allow-Origin', '*')
         response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
